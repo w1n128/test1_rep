@@ -22,6 +22,8 @@
       this.moving = false;
       this.idleT = 0;
       this.stepT = 0;
+      this.throwT = 0;
+      this.slideT = 0;
       this.inventory = { mousetrap: 0, puddle: 0, firecracker: 0, trapdoor: 0, banana: 0 };
       this.selectedTrap = 0;
       // Стартовые припасы — чтобы прототип сразу был интерактивным.
@@ -82,19 +84,28 @@
         return;
       }
 
-      // Скольжение по луже
+      // Скольжение по луже / банану
       if (this.sliding) {
         const speed = C.SLIDE_SPEED;
         const stepX = this.sliding.dx * speed * dt;
         const stepY = this.sliding.dy * speed * dt;
-        if (!this.tryMove(stepX, 0)) this.sliding = null;
-        else if (!this.tryMove(0, stepY)) this.sliding = null;
+        let blocked = false;
+        if (stepX !== 0 && !this.tryMove(stepX, 0)) blocked = true;
+        if (stepY !== 0 && !this.tryMove(0, stepY)) blocked = true;
+        this.slideT -= dt;
+        // Останавливаем только если упёрлись в стену И прошло минимальное время скольжения.
+        if (blocked && this.slideT <= 0) {
+          this.sliding = null;
+        }
         this.dir = dirFromVec(this.sliding ? this.sliding.dx : 0, this.sliding ? this.sliding.dy : 0) || this.dir;
         this.moving = true;
         this.walkT += dt;
         triggerTrapsAt(this, traps);
         return;
       }
+
+      // Тики анимаций «бросок»
+      if (this.throwT > 0) this.throwT = Math.max(0, this.throwT - dt);
 
       // Обычное управление
       let dx = 0, dy = 0;
@@ -173,6 +184,7 @@
         walkT: this.walkT,
         moving: this.moving,
         idleT: this.idleT,
+        throwT: this.throwT,
         inventory: { ...this.inventory },
         selectedTrap: this.selectedTrap,
       };
@@ -188,6 +200,7 @@
       this.walkT = s.walkT;
       this.moving = s.moving;
       this.idleT = s.idleT;
+      this.throwT = s.throwT || 0;
       this.inventory = { ...s.inventory };
       this.selectedTrap = s.selectedTrap;
     }

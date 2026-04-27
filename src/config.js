@@ -31,11 +31,14 @@
     TRAP_TYPES: ['mousetrap', 'puddle', 'firecracker', 'trapdoor', 'banana'],
     TRAP_ARM_DELAY: 0.4,
     FIRECRACKER_FUSE: 1.5,
-    FIRECRACKER_RADIUS_TILES: 1.5,
+    FIRECRACKER_RADIUS_TILES: 3.0,
     PUDDLE_LIFETIME: 8.0,
     TRAPDOOR_FALL_TIME: 2.0,
     BANANA_THROW_TILES: 3,
     BANANA_LIFETIME: 6.0,
+    BANANA_FLIGHT_TIME: 0.32,
+    SLIDE_MIN_TIME: 0.55, // минимальное время скольжения, даже если упёрлись в стену
+    THROW_ANIM_TIME: 0.3,
     STEALTH_IDLE_TIME: 1.0,    // енот: время бездействия до невидимости
     STEALTH_FADE_TIME: 0.3,    // длительность fade-out
 

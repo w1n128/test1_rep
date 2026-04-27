@@ -14,7 +14,7 @@
       if (!Ctx) return false;
       ctx = new Ctx();
       master = ctx.createGain();
-      master.gain.value = 0.45;
+      master.gain.value = _muted ? 0 : 0.45;
       master.connect(ctx.destination);
       sfxGain = ctx.createGain();
       sfxGain.gain.value = 1.0;
@@ -27,6 +27,8 @@
     }
     return true;
   }
+
+  let _muted = false;
 
   function out(dest) { return dest === 'music' ? musicGain : sfxGain; }
 
@@ -298,9 +300,17 @@
     musicGain.gain.value = v;
   }
 
+  function setMuted(m) {
+    _muted = !!m;
+    if (!ensure()) return;
+    master.gain.value = _muted ? 0 : 0.45;
+  }
+  function isMuted() { return _muted; }
+
   G.audio = {
     init: ensure,
     play,
+    setMuted, isMuted,
     music: { start: startMusic, stop: stopMusic, setVolume: setMusicVolume },
   };
 })();

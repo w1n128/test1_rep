@@ -18,6 +18,28 @@
   window.addEventListener('keydown', initAudioOnce);
   window.addEventListener('mousedown', initAudioOnce);
 
+  // ===== Mute-кнопка в правом верхнем углу =====
+  const MUTE_BTN = { x: C.CANVAS_W - 36, y: 8, w: 28, h: 28 };
+  function isInsideMute(px, py) {
+    return px >= MUTE_BTN.x && px <= MUTE_BTN.x + MUTE_BTN.w &&
+           py >= MUTE_BTN.y && py <= MUTE_BTN.y + MUTE_BTN.h;
+  }
+  function canvasCoords(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+    return [x, y];
+  }
+  canvas.addEventListener('click', (e) => {
+    const [x, y] = canvasCoords(e);
+    if (isInsideMute(x, y)) {
+      const next = !(G.audio && G.audio.isMuted && G.audio.isMuted());
+      if (G.audio && G.audio.setMuted) G.audio.setMuted(next);
+    }
+  });
+  // Клавиша M в нескольких местах уже занята «меню», поэтому отдельная — N (как «sound off»)
+  // но проще: переключение через клавишу мыши/тап. Без отдельной горячей клавиши.
+
   // Ввод кода комнаты в NET_LOBBY_JOIN
   window.addEventListener('keydown', (e) => {
     if (state !== STATE.NET_LOBBY_JOIN) return;
@@ -163,6 +185,28 @@
       winnerId = msg.winnerId;
       state = STATE.GAMEOVER;
       if (G.audio && G.audio.music) G.audio.music.stop();
+      return;
+    }
+    if (msg.t === 'pause' && netRole === 'client') {
+      if (msg.paused) {
+        state = STATE.PAUSED;
+        if (G.audio && G.audio.music) G.audio.music.stop();
+      } else {
+        state = STATE.PLAYING;
+        if (G.audio && G.audio.music) G.audio.music.start();
+      }
+      return;
+    }
+    if (msg.t === 'pauseRequest' && netRole === 'host') {
+      if (msg.paused && state === STATE.PLAYING) {
+        state = STATE.PAUSED;
+        if (G.audio && G.audio.music) G.audio.music.stop();
+        G.net.send({ t: 'pause', paused: true });
+      } else if (!msg.paused && state === STATE.PAUSED) {
+        state = STATE.PLAYING;
+        if (G.audio && G.audio.music) G.audio.music.start();
+        G.net.send({ t: 'pause', paused: false });
+      }
       return;
     }
   }
@@ -311,11 +355,19 @@
     }
 
     if (state === STATE.PLAYING) {
-      // Пауза — только локально и не для клиента (он не держит истину).
-      if (G.input.sys.wasPressed('pause') && (mode !== 'net' || netRole === 'host')) {
-        state = STATE.PAUSED;
-        if (G.audio && G.audio.music) G.audio.music.stop();
-        return;
+      // Пауза — обе стороны могут запросить, но истинная пауза идёт через хоста.
+      if (G.input.sys.wasPressed('pause')) {
+        if (mode === 'net' && netRole === 'client') {
+          // Клиент: попросить хоста поставить паузу
+          G.net.send({ t: 'pauseRequest', paused: true });
+        } else {
+          state = STATE.PAUSED;
+          if (G.audio && G.audio.music) G.audio.music.stop();
+          if (mode === 'net' && netRole === 'host') {
+            G.net.send({ t: 'pause', paused: true });
+          }
+          return;
+        }
       }
       if (G.input.sys.wasPressed('menu'))  { returnToMenu(); return; }
 
@@ -345,25 +397,24 @@
       // Хост (или локальные режимы) — обычный tick
       if (ai) ai.update(dt);
       for (const p of players) p.update(dt, trapManager);
+      // На хосте: после player.update нужно сбросить justPressed у NetInputDevice,
+      // иначе клиентское нажатие будет повторяться каждый тик.
+      if (netInputDevice && netInputDevice.consume) netInputDevice.consume();
       trapManager.update(dt);
       pickupManager.update(dt);
       if (G.particles) G.particles.update(dt);
       if (G.render && G.render.updateShake) G.render.updateShake(dt);
 
-      // Хост шлёт снапшот ~30Hz (каждый 2-й тик)
+      // Хост шлёт снапшот каждый тик (60Hz) — для плавной анимации клиента
       if (mode === 'net' && netRole === 'host') {
-        snapshotInterval++;
-        if (snapshotInterval >= 2) {
-          snapshotInterval = 0;
-          G.net.send({
-            t: 'snap',
-            time,
-            p: players.map(p => p.serialize()),
-            tr: trapManager.serialize(),
-            pk: pickupManager.serialize(),
-            ev: G.net.flushEvents(),
-          });
-        }
+        G.net.send({
+          t: 'snap',
+          time,
+          p: players.map(p => p.serialize()),
+          tr: trapManager.serialize(),
+          pk: pickupManager.serialize(),
+          ev: G.net.flushEvents(),
+        });
       }
 
       // Условие победы
@@ -382,9 +433,17 @@
 
     if (state === STATE.PAUSED) {
       if (G.input.sys.wasPressed('pause')) {
-        state = STATE.PLAYING;
-        if (G.audio && G.audio.music) G.audio.music.start();
-        return;
+        if (mode === 'net' && netRole === 'client') {
+          // Клиент: попросить хоста снять паузу
+          G.net.send({ t: 'pauseRequest', paused: false });
+        } else {
+          state = STATE.PLAYING;
+          if (G.audio && G.audio.music) G.audio.music.start();
+          if (mode === 'net' && netRole === 'host') {
+            G.net.send({ t: 'pause', paused: false });
+          }
+          return;
+        }
       }
       if (G.input.sys.wasPressed('menu'))  { returnToMenu(); return; }
       return;
@@ -432,6 +491,51 @@
     ctx.textBaseline = 'top';
     ctx.textAlign = 'left';
     ctx.fillText('FPS ' + fps, C.CANVAS_W - 46, C.CANVAS_H - 12);
+
+    // Mute-кнопка в правом верхнем углу
+    drawMuteButton();
+  }
+
+  function drawMuteButton() {
+    const muted = !!(G.audio && G.audio.isMuted && G.audio.isMuted());
+    const x = MUTE_BTN.x, y = MUTE_BTN.y;
+    ctx.fillStyle = muted ? 'rgba(140,40,40,0.85)' : 'rgba(20,20,20,0.85)';
+    ctx.fillRect(x, y, MUTE_BTN.w, MUTE_BTN.h);
+    ctx.strokeStyle = muted ? '#ff8080' : '#888';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, MUTE_BTN.w - 1, MUTE_BTN.h - 1);
+    // Динамик: трапеция + волны
+    ctx.fillStyle = muted ? '#fff' : '#fff060';
+    // Корпус
+    ctx.fillRect(x + 6, y + 11, 3, 6);
+    ctx.beginPath();
+    ctx.moveTo(x + 9, y + 11);
+    ctx.lineTo(x + 14, y + 7);
+    ctx.lineTo(x + 14, y + 21);
+    ctx.lineTo(x + 9, y + 17);
+    ctx.closePath();
+    ctx.fill();
+    if (!muted) {
+      // Звуковые волны
+      ctx.strokeStyle = '#fff060';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(x + 14, y + 14, 4, -Math.PI / 3, Math.PI / 3);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x + 14, y + 14, 7, -Math.PI / 3, Math.PI / 3);
+      ctx.stroke();
+    } else {
+      // Крестик
+      ctx.strokeStyle = '#ff8080';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + 17, y + 9);
+      ctx.lineTo(x + 23, y + 19);
+      ctx.moveTo(x + 23, y + 9);
+      ctx.lineTo(x + 17, y + 19);
+      ctx.stroke();
+    }
   }
 
   function drawMenu() {

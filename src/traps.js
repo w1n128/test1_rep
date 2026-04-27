@@ -93,6 +93,22 @@
       this.list.push(trap);
       player.inventory[type] -= 1;
       G.fx.audio(type === 'banana' ? 'throw' : 'place');
+      // Запустить анимацию броска для банана
+      if (type === 'banana') {
+        player.throwT = C.THROW_ANIM_TIME;
+        const fromX = player.x;
+        const fromY = player.y;
+        const toX = tx * C.TILE + C.TILE / 2;
+        const toY = ty * C.TILE + C.TILE / 2;
+        this.effects.push({
+          kind: 'banana_throw',
+          fromX, fromY, toX, toY,
+          t: 0, lifetime: C.BANANA_FLIGHT_TIME,
+        });
+        // Пока банан летит — задержим его активацию: вместо обычного armDelay
+        // используем длительность полёта.
+        trap.armDelay = C.BANANA_FLIGHT_TIME;
+      }
       return true;
     }
 
@@ -125,6 +141,7 @@
           const d = dirVec(player.dir);
           if (d.x !== 0 || d.y !== 0) {
             player.sliding = { dx: d.x, dy: d.y };
+            player.slideT = C.SLIDE_MIN_TIME;
             fx.audio('splash');
             fx.particles('burstSplash', cx, cy);
           }
@@ -133,17 +150,23 @@
         if (!player.sliding) {
           const d = dirVec(player.dir);
           if (d.x !== 0 || d.y !== 0) {
+            // Сначала урон, потом скольжение (damage() сбрасывает sliding).
+            player.damage(1);
             player.sliding = { dx: d.x, dy: d.y };
+            player.slideT = C.SLIDE_MIN_TIME;
             trap.destroyed = true;
             fx.audio('slip');
             fx.particles('burstStars', cx, cy - 8);
           }
         }
       } else if (trap.type === 'trapdoor') {
+        // Сначала урон, затем падение (damage пропускает игроков с fallen>0).
+        player.damage(1);
         player.fallIntoTrapdoor();
         trap.destroyed = true;
         fx.audio('fall');
         fx.shake(5, 0.2);
+        fx.particles('burstStars', cx, cy - 8);
       }
       // Firecracker не триггерится наступанием — взрывается по таймеру.
     }

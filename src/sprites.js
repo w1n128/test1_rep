@@ -247,7 +247,7 @@
   // y=yellow eye area? нет, используем чёрные точки 'M' для глаз
   // M=eyes (тёмный)
 
-  function makeJanitor(dir, frame) {
+  function makeJanitor(dir, frame, pose = 'normal') {
     const r = blank(32, 32);
 
     // === Голова с кепкой (rows 0-13) ===
@@ -324,7 +324,33 @@
     }
 
     // Руки (по бокам)
-    if (dir === 'left') {
+    if (pose === 'throw') {
+      // Бросок: правая рука вытянута наружу/вперёд, левая прижата
+      fillRect(r, 5, 17, 2, 4, 'j');
+      if (dir === 'left') {
+        // вытянута влево
+        fillRect(r, 0, 16, 8, 2, 'j');
+        fillRect(r, 0, 17, 2, 1, 's');
+      } else if (dir === 'up') {
+        // вытянута вверх
+        fillRect(r, 23, 8, 3, 10, 'j');
+        fillRect(r, 23, 7, 3, 1, 's');
+      } else if (dir === 'down') {
+        // вытянута вниз — рука и кисть видны спереди
+        fillRect(r, 24, 16, 3, 10, 'j');
+        fillRect(r, 24, 26, 3, 1, 's');
+      } else {
+        // 'right' — вытянута вправо
+        fillRect(r, 24, 16, 8, 2, 'j');
+        fillRect(r, 30, 17, 2, 1, 's');
+      }
+    } else if (pose === 'slide') {
+      // Скольжение: обе руки разведены в стороны для баланса
+      fillRect(r, 0, 17, 7, 2, 'j');
+      fillRect(r, 25, 17, 7, 2, 'j');
+      fillRect(r, 0, 18, 2, 1, 's');
+      fillRect(r, 30, 18, 2, 1, 's');
+    } else if (dir === 'left') {
       // Левая рука вынесена вперёд
       fillRect(r, 5, 17, 2, 4, 'j');
       fillRect(r, 4, 19, 3, 2, 's');
@@ -384,16 +410,25 @@
   };
 
   G.sprites = G.sprites || {};
+  function jb(rows) { return makeBitmap(rows, janitorPalette); }
   G.sprites.janitor = {
-    down:  [makeBitmap(makeJanitor('down', 0), janitorPalette), makeBitmap(makeJanitor('down', 1), janitorPalette)],
-    up:    [makeBitmap(makeJanitor('up',   0), janitorPalette), makeBitmap(makeJanitor('up',   1), janitorPalette)],
-    left:  [makeBitmap(makeJanitor('left', 0), janitorPalette), makeBitmap(makeJanitor('left', 1), janitorPalette)],
-    right: [makeBitmap(flipH(makeJanitor('left', 0)), janitorPalette), makeBitmap(flipH(makeJanitor('left', 1)), janitorPalette)],
+    down:  [jb(makeJanitor('down', 0)), jb(makeJanitor('down', 1))],
+    up:    [jb(makeJanitor('up',   0)), jb(makeJanitor('up',   1))],
+    left:  [jb(makeJanitor('left', 0)), jb(makeJanitor('left', 1))],
+    right: [jb(flipH(makeJanitor('left', 0))), jb(flipH(makeJanitor('left', 1)))],
+    throw_down:  jb(makeJanitor('down',  0, 'throw')),
+    throw_up:    jb(makeJanitor('up',    0, 'throw')),
+    throw_left:  jb(makeJanitor('left',  0, 'throw')),
+    throw_right: jb(flipH(makeJanitor('left', 0, 'throw'))),
+    slide_down:  jb(makeJanitor('down',  0, 'slide')),
+    slide_up:    jb(makeJanitor('up',    0, 'slide')),
+    slide_left:  jb(makeJanitor('left',  0, 'slide')),
+    slide_right: jb(flipH(makeJanitor('left', 0, 'slide'))),
   };
 
   // --- Енот 32×32 ---
 
-  function makeRaccoon(dir, frame) {
+  function makeRaccoon(dir, frame, pose = 'normal') {
     const r = blank(32, 32);
 
     // Уши (треугольники сверху)
@@ -480,18 +515,45 @@
       fillRect(r, 31, 20, 1, 2, 'm');
     }
 
-    // Лапы (frame-зависимо)
-    const fOff = frame === 0 ? 0 : 1;
-    if (dir === 'left' || dir === 'right') {
-      fillRect(r, 8, 23, 4, 5 + fOff, 'R');
-      fillRect(r, 18, 23, 4, 5 - fOff, 'R');
-      fillRect(r, 8, 26 + fOff, 4, 2, 'm');
-      fillRect(r, 18, 26 - fOff, 4, 2, 'm');
+    // Лапы (frame-зависимо или поза)
+    if (pose === 'throw') {
+      // Передние лапы: одна вытянута наружу
+      fillRect(r, 8, 23, 4, 5, 'R');
+      fillRect(r, 8, 27, 4, 2, 'm');
+      if (dir === 'left') {
+        fillRect(r, 0, 18, 7, 2, 'R');
+        fillRect(r, 0, 19, 2, 1, 'w');
+      } else if (dir === 'up') {
+        fillRect(r, 22, 8, 3, 10, 'R');
+        fillRect(r, 22, 7, 3, 1, 'm');
+      } else if (dir === 'down') {
+        fillRect(r, 22, 16, 3, 10, 'R');
+        fillRect(r, 22, 26, 3, 1, 'w');
+      } else {
+        fillRect(r, 25, 18, 7, 2, 'R');
+        fillRect(r, 30, 19, 2, 1, 'w');
+      }
+    } else if (pose === 'slide') {
+      // Лапы веером в стороны
+      fillRect(r, 0, 21, 8, 2, 'R');
+      fillRect(r, 24, 21, 8, 2, 'R');
+      fillRect(r, 0, 22, 2, 1, 'm');
+      fillRect(r, 30, 22, 2, 1, 'm');
+      fillRect(r, 8, 24, 4, 4, 'R');
+      fillRect(r, 20, 24, 4, 4, 'R');
     } else {
-      fillRect(r, 8, 23, 4, 5 + (frame ? 1 : 0), 'R');
-      fillRect(r, 20, 23, 4, 5 - (frame ? 1 : 0), 'R');
-      fillRect(r, 8, 27 + (frame ? 1 : 0), 4, 2, 'm');
-      fillRect(r, 20, 27 - (frame ? 1 : 0), 4, 2, 'm');
+      const fOff = frame === 0 ? 0 : 1;
+      if (dir === 'left' || dir === 'right') {
+        fillRect(r, 8, 23, 4, 5 + fOff, 'R');
+        fillRect(r, 18, 23, 4, 5 - fOff, 'R');
+        fillRect(r, 8, 26 + fOff, 4, 2, 'm');
+        fillRect(r, 18, 26 - fOff, 4, 2, 'm');
+      } else {
+        fillRect(r, 8, 23, 4, 5 + (frame ? 1 : 0), 'R');
+        fillRect(r, 20, 23, 4, 5 - (frame ? 1 : 0), 'R');
+        fillRect(r, 8, 27 + (frame ? 1 : 0), 4, 2, 'm');
+        fillRect(r, 20, 27 - (frame ? 1 : 0), 4, 2, 'm');
+      }
     }
 
     return rowsToStrs(r);
@@ -504,11 +566,20 @@
     m: P.raccoonM,
   };
 
+  function rb(rows) { return makeBitmap(rows, raccoonPalette); }
   G.sprites.raccoon = {
-    down:  [makeBitmap(makeRaccoon('down', 0), raccoonPalette), makeBitmap(makeRaccoon('down', 1), raccoonPalette)],
-    up:    [makeBitmap(makeRaccoon('up',   0), raccoonPalette), makeBitmap(makeRaccoon('up',   1), raccoonPalette)],
-    left:  [makeBitmap(makeRaccoon('left', 0), raccoonPalette), makeBitmap(makeRaccoon('left', 1), raccoonPalette)],
-    right: [makeBitmap(flipH(makeRaccoon('left', 0)), raccoonPalette), makeBitmap(flipH(makeRaccoon('left', 1)), raccoonPalette)],
+    down:  [rb(makeRaccoon('down', 0)), rb(makeRaccoon('down', 1))],
+    up:    [rb(makeRaccoon('up',   0)), rb(makeRaccoon('up',   1))],
+    left:  [rb(makeRaccoon('left', 0)), rb(makeRaccoon('left', 1))],
+    right: [rb(flipH(makeRaccoon('left', 0))), rb(flipH(makeRaccoon('left', 1)))],
+    throw_down:  rb(makeRaccoon('down',  0, 'throw')),
+    throw_up:    rb(makeRaccoon('up',    0, 'throw')),
+    throw_left:  rb(makeRaccoon('left',  0, 'throw')),
+    throw_right: rb(flipH(makeRaccoon('left', 0, 'throw'))),
+    slide_down:  rb(makeRaccoon('down',  0, 'slide')),
+    slide_up:    rb(makeRaccoon('up',    0, 'slide')),
+    slide_left:  rb(makeRaccoon('left',  0, 'slide')),
+    slide_right: rb(flipH(makeRaccoon('left', 0, 'slide'))),
   };
 
   // --- Ловушки 32×32 ---

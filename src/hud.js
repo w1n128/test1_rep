@@ -142,10 +142,7 @@
     ctx.fillStyle = player.id === 1 ? '#ffe060' : '#a0e0ff';
     ctx.fillText(name, viewportX + 8, viewportY + viewportH - 20);
 
-    // Минимапа сверху по центру
-    if (players && traps && pickups) {
-      drawMinimap(ctx, viewportX, viewportY, viewportW, viewportH, player, players, traps, pickups);
-    }
+    // Минимапа отключена по запросу.
   }
 
   G.hud = { drawHUD };

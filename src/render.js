@@ -48,6 +48,8 @@
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
   function isTrapVisible(trap, viewerId) {
+    // Банан во время полёта (armDelay > 0) не показываем никому — будет проектил.
+    if (trap.type === 'banana' && !trap.armed) return false;
     if (trap.ownerId === viewerId) return true;
     if (trap.type === 'trapdoor') return false;
     if (!trap.armed) return false;
@@ -82,13 +84,17 @@
   function drawPickups(ctx, pickups, time) {
     const bgW = G.sprites.pickupBg.width;
     const bgOff = (C.TILE - bgW) / 2;
+    const iconSize = C.TILE / 2;
+    const iconOff = (C.TILE - iconSize) / 2;
     for (const pk of pickups.list) {
       const px = pk.tileX * C.TILE;
       const py = pk.tileY * C.TILE;
       const bob = Math.sin(pk.animT * 4) * 1.5;
+      // Жёлтый светящийся круг — фон
       ctx.drawImage(G.sprites.pickupBg, px + bgOff, py + bgOff + bob);
+      // Иконка ловушки в 2 раза меньше тайла, центрирована
       const trap = G.sprites.traps[pk.type];
-      ctx.drawImage(trap, px, py + bob, C.TILE, C.TILE);
+      ctx.drawImage(trap, px + iconOff, py + iconOff + bob, iconSize, iconSize);
     }
   }
 
@@ -104,6 +110,21 @@
         ctx.beginPath();
         ctx.arc(eff.x, eff.y, 12 + eff.t * 64, 0, Math.PI * 2);
         ctx.fill();
+      } else if (eff.kind === 'banana_throw') {
+        const a = Math.min(1, eff.t / eff.lifetime);
+        const x = eff.fromX + (eff.toX - eff.fromX) * a;
+        // Параболическая дуга: пиковая высота 28 px в середине
+        const arc = 28 * Math.sin(a * Math.PI);
+        const y = eff.fromY + (eff.toY - eff.fromY) * a - arc;
+        const sprite = G.sprites.traps.banana;
+        const size = 24;
+        // Лёгкое вращение через scaleX знак
+        const flip = (Math.floor(eff.t * 16) % 2) ? -1 : 1;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(flip, 1);
+        ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
+        ctx.restore();
       }
     }
   }
@@ -132,11 +153,19 @@
       alpha = 1 - fade * 0.92; // оставим лёгкий призрак
     }
 
-    const anim = G.sprites[p.character][p.dir];
-    let frame = anim[0];
-    if (p.moving) {
-      const idx = Math.floor(p.walkT / 0.18) % anim.length;
-      frame = anim[idx];
+    const sprites = G.sprites[p.character];
+    let frame;
+    if (p.sliding) {
+      frame = sprites['slide_' + p.dir] || sprites[p.dir][0];
+    } else if (p.throwT > 0) {
+      frame = sprites['throw_' + p.dir] || sprites[p.dir][0];
+    } else {
+      const anim = sprites[p.dir];
+      frame = anim[0];
+      if (p.moving) {
+        const idx = Math.floor(p.walkT / 0.18) % anim.length;
+        frame = anim[idx];
+      }
     }
     const half = C.TILE / 2;
     if (alpha < 1) ctx.globalAlpha = alpha;
