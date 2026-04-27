@@ -1,0 +1,15 @@
+# Локальные тестовые скриншоты Playwright
+.playwright-mcp/
+tj_game_*.png
+tj_v*_*.png
+
+# Системные
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Логи
+*.log
