@@ -8,10 +8,6 @@
   const ROOM_PREFIX = 'tjvse-'; // префикс к коду чтобы не пересекаться с чужими peer-id
   const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // без 0/O/1/I/L
   const CONNECT_TIMEOUT_MS = 20000;
-  const OPENRELAY_AUTH = {
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  };
 
   function generateCode(len = 6) {
     let s = '';
@@ -62,25 +58,6 @@
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun.relay.metered.ca:80' },
-          { urls: 'stun:openrelay.metered.ca:80' },
-          // Бесплатный TURN от openrelayproject — fallback при симметричном NAT
-          {
-            urls: 'turn:openrelay.metered.ca:80',
-            ...OPENRELAY_AUTH,
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:80?transport=tcp',
-            ...OPENRELAY_AUTH,
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:443',
-            ...OPENRELAY_AUTH,
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-            ...OPENRELAY_AUTH,
-          },
         ],
       },
     });
