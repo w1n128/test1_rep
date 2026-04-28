@@ -101,9 +101,9 @@
     }
 
     // Инвентарь — 5 слотов справа: иконка + «x3»
-    const slotW = 38, slotH = 22;
+    const slotW = 42, slotH = 24;
     const slotGap = 2;
-    const iconSize = 18;
+    const iconSize = 20;
     const right = viewportX + viewportW - 8;
     const invY = viewportY + 4;
 
@@ -120,7 +120,7 @@
         ctx.lineWidth = 1;
         ctx.strokeRect(x + 0.5, invY + 0.5, slotW - 1, slotH - 1);
       }
-      // Иконка ловушки (32×32 → 18×18)
+      // Иконка ловушки
       const sprite = G.sprites.traps[types[i]];
       if (sprite) {
         const iy = invY + (slotH - iconSize) / 2;

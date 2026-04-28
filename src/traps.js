@@ -52,9 +52,36 @@
     countByOwner(ownerId) {
       let n = 0;
       for (const t of this.list) {
-        if (!t.destroyed && t.ownerId === ownerId) n++;
+        if (!t.destroyed && t.ownerId === ownerId && t.type !== 'boombox') n++;
       }
       return n;
+    }
+
+    boomboxOf(ownerId) {
+      for (const t of this.list) {
+        if (!t.destroyed && t.type === 'boombox' && t.ownerId === ownerId) return t;
+      }
+      return null;
+    }
+
+    removeBoomboxFor(ownerId) {
+      let removed = false;
+      for (const t of this.list) {
+        if (!t.destroyed && t.type === 'boombox' && t.ownerId === ownerId) {
+          t.destroyed = true;
+          removed = true;
+        }
+      }
+      return removed;
+    }
+
+    placeBoombox(player) {
+      // Снимем старый магнитофон того же владельца, если был
+      const old = this.boomboxOf(player.id);
+      if (old) old.destroyed = true;
+      const trap = new Trap('boombox', player.id, player.tileX, player.tileY);
+      trap.armDelay = 0;
+      this.list.push(trap);
     }
 
     trapAtTile(tileX, tileY) {
@@ -121,10 +148,28 @@
 
     triggerForPlayer(player, tx, ty) {
       if (!player.alive || player.fallen > 0) return;
+      // Магнитофон обрабатываем отдельно: при пробегании ДРУГОГО игрока — выключаем
+      for (const t of this.list) {
+        if (t.destroyed) continue;
+        if (t.type === 'boombox' && t.tileX === tx && t.tileY === ty && t.ownerId !== player.id) {
+          // Найти владельца и снять танец
+          if (this.players) {
+            for (const p of this.players) {
+              if (p.id === t.ownerId) {
+                p.dancing = false;
+                p.danceHealT = 0;
+              }
+            }
+          }
+          t.destroyed = true;
+          if (G.fx) G.fx.audio('boombox_off');
+        }
+      }
       // Может быть несколько ловушек на одном тайле? По правилам tryPlace — нет.
       const trap = this.trapAtTile(tx, ty);
       if (!trap) return;
       if (!trap.armed) return;
+      if (trap.type === 'boombox') return; // дальнейшая логика — только обычные ловушки
       const cx = trap.tileX * C.TILE + C.TILE / 2;
       const cy = trap.tileY * C.TILE + C.TILE / 2;
       const fx = G.fx;
@@ -132,9 +177,12 @@
         if (player.damage(1)) {
           trap.destroyed = true;
           this.effects.push({ kind: 'snap', x: cx, y: cy, t: 0, lifetime: 0.25 });
-          fx.audio('snap');
-          fx.shake(4, 0.15);
-          fx.particles('burstStars', cx, cy - 8);
+          fx.audio('mousetrap_snap');
+          fx.shake(5, 0.18);
+          // Звёздочки от удара — спавним прямо около персонажа
+          fx.particles('burstStars', player.x, player.y - 14);
+          fx.particles('burstStars', player.x - 8, player.y - 8);
+          fx.particles('burstStars', player.x + 8, player.y - 8);
         }
       } else if (trap.type === 'puddle') {
         if (!player.sliding) {

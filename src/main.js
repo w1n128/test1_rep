@@ -82,6 +82,15 @@
   let ai = null;
   let winnerId = null;
   let time = 0;
+  let matchTime = 0;
+
+  function syncReactiveMusic() {
+    if (!G.audio || !G.audio.music || !players.length) return;
+    const anyDancing = players.some((p) => p.alive && p.dancing);
+    const anyStar = players.some((p) => p.alive && p.starT > 0);
+    if (G.audio.music.setMode) G.audio.music.setMode(anyDancing ? 'disco' : 'chase');
+    if (G.audio.music.setStarBoost) G.audio.music.setStarBoost(anyStar);
+  }
 
   function startMatch(chosenMode, opts = {}) {
     mode = chosenMode;
@@ -133,8 +142,10 @@
 
     winnerId = null;
     snapshotInterval = 0;
+    matchTime = 0;
     state = STATE.PLAYING;
     if (G.audio && G.audio.music) G.audio.music.start();
+    syncReactiveMusic();
   }
 
   // Локальный игрок (для камеры/ввода) в сетевом режиме.
@@ -179,6 +190,8 @@
       if (msg.pk && pickupManager) pickupManager.applySnapshot(msg.pk);
       if (msg.ev && G.net && G.net.applyEvents) G.net.applyEvents(msg.ev);
       if (typeof msg.time === 'number') time = msg.time;
+      if (typeof msg.matchTime === 'number') matchTime = msg.matchTime;
+      syncReactiveMusic();
       return;
     }
     if (msg.t === 'gameover' && netRole === 'client') {
@@ -370,7 +383,6 @@
         }
       }
       if (G.input.sys.wasPressed('menu'))  { returnToMenu(); return; }
-
       if (mode === 'net' && netRole === 'client') {
         // Клиент: только косметика и пересылка ввода
         if (G.particles) G.particles.update(dt);
@@ -395,21 +407,47 @@
       }
 
       // Хост (или локальные режимы) — обычный tick
+      matchTime += dt;
       if (ai) ai.update(dt);
       for (const p of players) p.update(dt, trapManager);
       // На хосте: после player.update нужно сбросить justPressed у NetInputDevice,
       // иначе клиентское нажатие будет повторяться каждый тик.
       if (netInputDevice && netInputDevice.consume) netInputDevice.consume();
+
+      // Star touch damage: игрок со звездой при касании другого наносит урон
+      for (const p of players) {
+        if (!p.alive || p.starT <= 0) continue;
+        for (const q of players) {
+          if (q.id === p.id || !q.alive) continue;
+          const dx = p.x - q.x;
+          const dy = p.y - q.y;
+          if (dx * dx + dy * dy < C.PLAYER_HITBOX * C.PLAYER_HITBOX) {
+            if (p.starTouchT <= 0) {
+              if (q.damage(1)) {
+                p.starT = 0;
+                p.starTouchT = 0;
+                if (G.fx) {
+                  G.fx.particles('burstStars', q.x, q.y - 12);
+                  G.fx.shake(3, 0.12);
+                }
+              }
+            }
+          }
+        }
+      }
+
       trapManager.update(dt);
       pickupManager.update(dt);
       if (G.particles) G.particles.update(dt);
       if (G.render && G.render.updateShake) G.render.updateShake(dt);
+      syncReactiveMusic();
 
       // Хост шлёт снапшот каждый тик (60Hz) — для плавной анимации клиента
       if (mode === 'net' && netRole === 'host') {
         G.net.send({
           t: 'snap',
           time,
+          matchTime,
           p: players.map(p => p.serialize()),
           tr: trapManager.serialize(),
           pk: pickupManager.serialize(),
@@ -475,9 +513,9 @@
       // PLAYING / PAUSED / GAMEOVER
       if (mode === 'net') {
         const me = localNetPlayer();
-        if (me) G.render.drawSingleScreen(ctx, me, players, trapManager, pickupManager, time);
+        if (me) G.render.drawSingleScreen(ctx, me, players, trapManager, pickupManager, time, matchTime);
       } else {
-        G.render.drawSplitScreen(ctx, players, trapManager, pickupManager, time);
+        G.render.drawSplitScreen(ctx, players, trapManager, pickupManager, time, matchTime);
       }
       if (state === STATE.PAUSED)   drawPaused();
       if (state === STATE.GAMEOVER) drawGameOver();
@@ -550,9 +588,9 @@
 
     const cx = C.CANVAS_W / 2;
 
-    // Превью персонажей (96×96)
+    // Превью персонажей
     ctx.drawImage(G.sprites.janitor.down[0], cx - 144, 140, 96, 96);
-    ctx.drawImage(G.sprites.raccoon.down[0], cx + 48, 140, 96, 96);
+    ctx.drawImage(G.sprites.raccoon.down[0], cx + 58, 150, 77, 77);
     ctx.font = 'bold 14px monospace';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffe060';
@@ -564,9 +602,9 @@
     ctx.fillStyle = '#222';
     ctx.font = 'bold 40px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('ДВОРНИК vs ЕНОТ', cx + 2, 70);
+    ctx.fillText('СВАЛКУС', cx + 2, 70);
     ctx.fillStyle = '#fff060';
-    ctx.fillText('ДВОРНИК vs ЕНОТ', cx, 68);
+    ctx.fillText('СВАЛКУС', cx, 68);
 
     ctx.font = '13px monospace';
     ctx.fillStyle = '#ddd';
@@ -762,7 +800,7 @@
       {
         type: 'firecracker',
         name: 'Петарда',
-        desc: 'Фитиль 1.5 сек, взрыв в радиусе 3 тайла, урон 1. До 3 в инвентаре.',
+        desc: 'Фитиль 1.05 сек, взрыв в радиусе 3 тайла, урон 1. До 3 в инвентаре.',
       },
       {
         type: 'trapdoor',
@@ -809,7 +847,9 @@
     ctx.fillStyle = '#9cc';
     ctx.fillText('Управление 2 (Енот): стрелки, «.» поставить, «,» переключить', cx, baseY + 18);
     ctx.fillStyle = '#ccc';
-    ctx.fillText('Получил 5 ударов — проиграл. Активных ловушек одновременно: до 5.', cx, baseY + 40);
+    ctx.fillText('Получил 5 ударов — проиграл. Активных ловушек одновременно: до 10.', cx, baseY + 40);
+    ctx.fillStyle = '#a0e0ff';
+    ctx.fillText('После 120 сек наступает ночь на 60 сек: динамика видна только в луче фонарика.', cx, baseY + 62);
   }
 
   function drawOverlay(title, sub) {

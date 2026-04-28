@@ -160,8 +160,55 @@
       case 'damage':
         tone(220, 0.15, 'sawtooth', 0.18, 0, 110);
         break;
+      // --- Реакция дворника на боль: грубое низкое «ой!» ---
+      case 'hurt_janitor':
+        if (!canPlay('hurt_janitor', 250)) return;
+        tone(180, 0.18, 'sawtooth', 0.22, 0, 90);
+        tone(240, 0.10, 'square', 0.12, 0.02, 140);
+        noise(0.06, 0.06, 800, 0.02);
+        break;
+      // --- Реакция енота на боль: высокий писк «ии!» ---
+      case 'hurt_raccoon':
+        if (!canPlay('hurt_raccoon', 250)) return;
+        tone(1200, 0.12, 'square', 0.16, 0, 1700);
+        tone(1500, 0.08, 'sine', 0.10, 0.04, 900);
+        break;
+      // --- Резкий металлический щелчок мышеловки ---
+      case 'mousetrap_snap':
+        if (!canPlay('mousetrap_snap', 60)) return;
+        tone(3200, 0.025, 'square', 0.22, 0, 1800);
+        tone(2000, 0.04, 'square', 0.16, 0.005, 600);
+        noise(0.05, 0.18, 4000);
+        // глухой деревянный «тук»
+        tone(140, 0.08, 'sine', 0.10, 0.01, 80);
+        break;
       case 'menu':
         tone(660, 0.06, 'square', 0.1);
+        break;
+      // --- Power-up: звезда (восходящая фанфара) ---
+      case 'star':
+        tone(523, 0.10, 'square', 0.18, 0.00);    // C5
+        tone(659, 0.10, 'square', 0.18, 0.08);    // E5
+        tone(784, 0.10, 'square', 0.18, 0.16);    // G5
+        tone(1047, 0.20, 'square', 0.20, 0.24);   // C6
+        tone(1318, 0.30, 'sine',   0.16, 0.32);   // E6 sustain
+        break;
+      // --- Power-up: метла (взмах + пыль) ---
+      case 'broom':
+        noise(0.30, 0.20, 1500);
+        tone(700, 0.18, 'sine', 0.10, 0, 200);
+        noise(0.20, 0.10, 800, 0.10);
+        break;
+      // --- Магнитофон включён (короткий хит) ---
+      case 'boombox_on':
+        tone(120, 0.18, 'square', 0.20);
+        tone(240, 0.10, 'square', 0.12, 0.04);
+        noise(0.10, 0.10, 1200);
+        break;
+      // --- Магнитофон выключен (спад тона) ---
+      case 'boombox_off':
+        tone(440, 0.30, 'sawtooth', 0.18, 0, 80);
+        noise(0.10, 0.06, 600, 0.05);
         break;
     }
   }
@@ -220,9 +267,39 @@
     },
   ];
 
+  // === Диско-секция (другой темп, 4-on-floor бочка, открытые хэты, синкопа баса) ===
+  // Все паттерны — оригинальные, в Am/F-диапазоне.
+  const DISCO_PATTERNS = [
+    {
+      // Основной диско-грув в Am
+      bass: ['A2', null, null, 'A2', 'A3', null, null, 'E3',
+             'F2', null, null, 'F2', 'A3', null, 'G3', null],
+      lead: ['E5', null, 'A5', null, 'C6', null, 'E5', null,
+             'F5', null, 'A5', null, 'C6', null, 'D5', 'C5'],
+      hat:  [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+      kick: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
+      clap: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+      open: [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
+    },
+    {
+      // Восходящий вариант
+      bass: ['F2', null, null, 'F2', 'C3', null, null, 'F3',
+             'G2', null, null, 'G2', 'D3', null, 'G3', null],
+      lead: ['F5', 'A5', 'C6', 'A5', 'F5', null, 'E5', null,
+             'G5', 'B5', 'D6', 'B5', 'G5', null, 'F5', null],
+      hat:  [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+      kick: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
+      clap: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
+      open: [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
+    },
+  ];
+
   const TEMPO_BPM = 152;
-  const STEP_SEC = 60 / TEMPO_BPM / 4; // 16-я нота
+  const TEMPO_DISCO_BPM = 124;
+  let STEP_SEC = 60 / TEMPO_BPM / 4; // 16-я нота — пересчитываем при смене режима
   const PATTERN_LEN = 16;
+  let mode = 'chase'; // 'chase' | 'disco'
+  let starBoost = false;
 
   let musicTimer = null;
   let stepIdx = 0;
@@ -230,29 +307,54 @@
   let loopsInPattern = 0;
   let scheduledUpTo = 0;
 
+  function refreshStepSec() {
+    const bpm = mode === 'disco' ? TEMPO_DISCO_BPM : TEMPO_BPM;
+    const mul = starBoost && window.G && window.G.config ? window.G.config.STAR_MUSIC_SPEED_MUL : 1;
+    STEP_SEC = 60 / (bpm * mul) / 4;
+  }
+
   function playStep(patternIdx, step, when) {
-    const p = PATTERNS[patternIdx];
-    // Бас — pluck triangle
+    const patterns = mode === 'disco' ? DISCO_PATTERNS : PATTERNS;
+    const p = patterns[patternIdx % patterns.length];
+    // Бас
     if (p.bass[step]) {
-      pluck(n(p.bass[step]), 0.28, 0.20, when, 'music');
-      // Лёгкий «октавный двойник» сверху для мульти-скока
-      pluck(n(p.bass[step]) * 2, 0.14, 0.07, when + 0.02, 'music');
-    }
-    // Мелодия — square с быстрой атакой, имитация мульт-кларнета
-    if (p.lead[step]) {
-      tone(n(p.lead[step]), 0.18, 'square', 0.09, when, null, 'music');
-      // Лёгкий хвостик-фолл вниз — cartoon-эффект
-      if (step === 7 || step === 15) {
-        tone(n(p.lead[step]) * 0.95, 0.12, 'square', 0.04, when + 0.02, n(p.lead[step]) * 0.6, 'music');
+      if (mode === 'disco') {
+        // В диско бас sine, чуть длиннее, с резким акцентом
+        pluck(n(p.bass[step]), 0.20, 0.24, when, 'music');
+      } else {
+        pluck(n(p.bass[step]), 0.28, 0.20, when, 'music');
+        pluck(n(p.bass[step]) * 2, 0.14, 0.07, when + 0.02, 'music');
       }
     }
-    // Hi-hat
+    // Мелодия
+    if (p.lead[step]) {
+      if (mode === 'disco') {
+        // Синтовый лид
+        tone(n(p.lead[step]), 0.16, 'sawtooth', 0.07, when, null, 'music');
+        tone(n(p.lead[step]) * 2, 0.12, 'square', 0.04, when, null, 'music');
+      } else {
+        tone(n(p.lead[step]), 0.18, 'square', 0.09, when, null, 'music');
+        if (step === 7 || step === 15) {
+          tone(n(p.lead[step]) * 0.95, 0.12, 'square', 0.04, when + 0.02, n(p.lead[step]) * 0.6, 'music');
+        }
+      }
+    }
+    // Hi-hat (закрытый)
     if (p.hat[step]) {
-      noise(0.025, 0.04, 6000, when, 'music');
+      noise(0.025, mode === 'disco' ? 0.035 : 0.04, 6000, when, 'music');
+    }
+    // Открытый хэт (только в диско)
+    if (mode === 'disco' && p.open && p.open[step]) {
+      noise(0.10, 0.05, 7000, when, 'music');
+    }
+    // Бочка — 4-on-floor (только в диско)
+    if (mode === 'disco' && p.kick && p.kick[step]) {
+      tone(110, 0.10, 'sine', 0.30, when, 50, 'music');
+      noise(0.04, 0.10, 200, when, 'music');
     }
     // Clap
     if (p.clap[step]) {
-      noise(0.07, 0.10, 1800, when, 'music');
+      noise(0.07, mode === 'disco' ? 0.12 : 0.10, 1800, when, 'music');
     }
   }
 
@@ -281,6 +383,9 @@
     if (!ensure()) return;
     if (musicTimer) return;
     if (ctx.state === 'suspended') ctx.resume();
+    mode = 'chase';
+    starBoost = false;
+    refreshStepSec();
     stepIdx = 0;
     patIdx = 0;
     loopsInPattern = 0;
@@ -300,6 +405,26 @@
     musicGain.gain.value = v;
   }
 
+  function setMode(newMode) {
+    if (newMode !== 'chase' && newMode !== 'disco') return;
+    if (mode === newMode) return;
+    mode = newMode;
+    refreshStepSec();
+    // Сбросить позицию паттерна, чтобы новая секция стартовала с начала
+    stepIdx = 0;
+    patIdx = 0;
+    loopsInPattern = 0;
+    if (ctx) scheduledUpTo = ctx.currentTime + 0.05;
+  }
+
+  function setStarBoost(active) {
+    active = !!active;
+    if (starBoost === active) return;
+    starBoost = active;
+    refreshStepSec();
+    if (ctx) scheduledUpTo = ctx.currentTime + 0.05;
+  }
+
   function setMuted(m) {
     _muted = !!m;
     if (!ensure()) return;
@@ -311,6 +436,6 @@
     init: ensure,
     play,
     setMuted, isMuted,
-    music: { start: startMusic, stop: stopMusic, setVolume: setMusicVolume },
+    music: { start: startMusic, stop: stopMusic, setVolume: setMusicVolume, setMode, setStarBoost },
   };
 })();

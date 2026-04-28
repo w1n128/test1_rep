@@ -41,8 +41,13 @@
       return false;
     }
     spawnRandom() {
-      const types = C.TRAP_TYPES;
-      const type = types[Math.floor(Math.random() * types.length)];
+      // С шансом POWERUP_SPAWN_CHANCE — power-up, иначе обычная ловушка
+      let type;
+      if (Math.random() < C.POWERUP_SPAWN_CHANCE) {
+        type = C.POWERUP_TYPES[Math.floor(Math.random() * C.POWERUP_TYPES.length)];
+      } else {
+        type = C.TRAP_TYPES[Math.floor(Math.random() * C.TRAP_TYPES.length)];
+      }
       for (let attempt = 0; attempt < 50; attempt++) {
         const x = 1 + Math.floor(Math.random() * (C.ARENA_W - 2));
         const y = 1 + Math.floor(Math.random() * (C.ARENA_H - 2));
@@ -63,9 +68,16 @@
       if (!this.players) return;
       for (const player of this.players) {
         if (!player.alive || player.fallen > 0) continue;
+        if (player.dancing) continue; // танцующий не подбирает
         const pk = this.pickupAtTile(player.tileX, player.tileY);
         if (pk) {
-          if (player.addPickup(pk.type)) {
+          if (C.POWERUP_TYPES.indexOf(pk.type) >= 0) {
+            // Power-up: активируется мгновенно
+            player.activatePowerup(pk.type);
+            this.list = this.list.filter((p) => p !== pk);
+            G.fx.audio('pickup');
+            G.fx.particles('burstStars', player.x, player.y - 8);
+          } else if (player.addPickup(pk.type)) {
             this.list = this.list.filter((p) => p !== pk);
             G.fx.audio('pickup');
             G.fx.particles('burstStars', player.x, player.y - 8);

@@ -19,9 +19,9 @@ html, body {
 #game {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  width: min(98vw, calc(98vh * 768 / 608));
+  width: min(98vw, calc(98vh * 960 / 720));
   height: auto;
-  aspect-ratio: 768 / 608;
+  aspect-ratio: 960 / 720;
   background: #2a2a2a;
   box-shadow: 0 0 24px rgba(0, 0, 0, 0.7);
 }

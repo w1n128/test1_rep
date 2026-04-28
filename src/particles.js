@@ -112,8 +112,9 @@
 
   function clear() { list.length = 0; }
 
-  function draw(ctx) {
+  function draw(ctx, isVisibleAt) {
     for (const p of list) {
+      if (isVisibleAt && !isVisibleAt(p.x, p.y)) continue;
       const k = 1 - p.t / p.lifetime;
       const a = Math.max(0, Math.min(1, k));
       ctx.globalAlpha = a;
@@ -141,8 +142,30 @@
     ctx.globalAlpha = 1;
   }
 
+  function spawnDustCloud(cx, cy) {
+    // Большой плоский «взрыв» пыли — много мягких частиц
+    const C = window.G && window.G.config;
+    const tile = C ? C.TILE : 48;
+    const radius = tile * 1.5;
+    for (let i = 0; i < 60; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const r = Math.random() * radius;
+      const sp = rand(20, 70);
+      spawn(cx + Math.cos(ang) * r * 0.3, cy + Math.sin(ang) * r * 0.3, {
+        vx: Math.cos(ang) * sp,
+        vy: Math.sin(ang) * sp - rand(0, 30),
+        ay: 30,
+        drag: 1.4,
+        lifetime: rand(0.6, 1.2),
+        color: Math.random() < 0.5 ? 'rgba(212,200,160,0.85)' : 'rgba(180,168,130,0.75)',
+        size: Math.floor(rand(2, 5)),
+      });
+    }
+  }
+
   G.particles = {
     spawn, update, draw, clear,
     burstSparks, burstSplash, spawnDust, burstStars, burstHearts,
+    spawnDustCloud,
   };
 })();

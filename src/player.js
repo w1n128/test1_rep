@@ -26,6 +26,12 @@
       this.slideT = 0;
       this.inventory = { mousetrap: 0, puddle: 0, firecracker: 0, trapdoor: 0, banana: 0 };
       this.selectedTrap = 0;
+      // Power-up состояния
+      this.starT = 0;           // звезда: бессмертие + 2x скорость
+      this.hiddenT = 0;         // метла: невидимость
+      this.dancing = false;     // магнитофон: танец
+      this.danceHealT = 0;      // накопитель для heal каждые BOOMBOX_HEAL_INTERVAL
+      this.starTouchT = 0;      // cooldown между уронами от касания звездой
       // Стартовые припасы — чтобы прототип сразу был интерактивным.
       this.inventory.mousetrap = 2;
       this.inventory.firecracker = 1;
@@ -50,14 +56,49 @@
     damage(amount) {
       if (!this.alive) return false;
       if (this.invincibility > 0) return false;
+      if (this.starT > 0) return false; // звезда — полный иммунитет
       if (this.fallen > 0) return false;
       this.hp = Math.max(0, this.hp - amount);
       this.invincibility = C.INVINCIBILITY_AFTER_HIT;
       this.sliding = null;
+      if (window.G && window.G.audio) {
+        window.G.audio.play(this.character === 'raccoon' ? 'hurt_raccoon' : 'hurt_janitor');
+      }
       if (this.hp <= 0) {
         this.alive = false;
       }
       return true;
+    }
+
+    heal(amount) {
+      if (!this.alive) return;
+      this.hp = Math.min(C.PLAYER_MAX_HP, this.hp + amount);
+    }
+
+    activatePowerup(type) {
+      const fx = window.G && window.G.fx;
+      if (type === 'star') {
+        this.starT = C.STAR_DURATION;
+        if (fx) fx.audio('star');
+      } else if (type === 'broom') {
+        this.hiddenT = C.BROOM_HIDDEN;
+        if (fx) {
+          fx.audio('broom');
+          // Пылевое облако вокруг персонажа (3×3 тайла)
+          fx.particles('spawnDustCloud', this.x, this.y);
+        }
+      } else if (type === 'boombox') {
+        // Создать тайл-магнитофон на текущей клетке
+        if (window.G && window.G.trapManager) {
+          window.G.trapManager.placeBoombox(this);
+        }
+        this.dancing = true;
+        this.danceHealT = 0;
+        if (window.G && window.G.audio && window.G.audio.music && window.G.audio.music.setMode) {
+          window.G.audio.music.setMode('disco');
+        }
+        if (fx) fx.audio('boombox_on');
+      }
     }
 
     fallIntoTrapdoor() {
@@ -70,6 +111,36 @@
     update(dt, traps) {
       if (!this.alive) return;
       if (this.invincibility > 0) this.invincibility -= dt;
+
+      // === Power-up таймеры ===
+      if (this.starT > 0) {
+        this.starT = Math.max(0, this.starT - dt);
+        this.starTouchT = Math.max(0, this.starTouchT - dt);
+      }
+      if (this.hiddenT > 0) this.hiddenT = Math.max(0, this.hiddenT - dt);
+
+      // === Танец под магнитофон: блокирует движение, лечит ===
+      if (this.dancing) {
+        if (this.input.wasPressed && this.input.wasPressed('place')) {
+          this.dancing = false;
+          this.danceHealT = 0;
+          if (traps && traps.removeBoomboxFor) traps.removeBoomboxFor(this.id);
+          if (window.G && window.G.fx) window.G.fx.audio('boombox_off');
+          this.input.consume && this.input.consume();
+          return;
+        }
+        this.danceHealT += dt;
+        if (this.danceHealT >= C.BOOMBOX_HEAL_INTERVAL) {
+          this.danceHealT -= C.BOOMBOX_HEAL_INTERVAL;
+          this.heal(C.BOOMBOX_HEAL_AMOUNT);
+          if (window.G && window.G.particles) window.G.particles.burstHearts(this.x, this.y - 16);
+        }
+        // Анимация: персонаж «топчется на месте», моргаем кадры walk
+        this.walkT += dt * 2;
+        this.moving = true;
+        this.input.consume && this.input.consume();
+        return;
+      }
 
       if (this.fallen > 0) {
         this.fallen -= dt;
@@ -118,7 +189,7 @@
         const inv = 1 / Math.SQRT2;
         dx *= inv; dy *= inv;
       }
-      const speed = C.PLAYER_SPEED;
+      const speed = C.PLAYER_SPEED * (this.starT > 0 ? C.STAR_SPEED_MUL : 1);
       const moved = this.tryMove(dx * speed * dt, 0) | this.tryMove(0, dy * speed * dt);
       this.moving = (dx !== 0 || dy !== 0);
       if (this.moving) {
@@ -187,6 +258,10 @@
         throwT: this.throwT,
         inventory: { ...this.inventory },
         selectedTrap: this.selectedTrap,
+        starT: this.starT,
+        hiddenT: this.hiddenT,
+        dancing: this.dancing,
+        danceHealT: this.danceHealT,
       };
     }
     applySnapshot(s) {
@@ -203,6 +278,10 @@
       this.throwT = s.throwT || 0;
       this.inventory = { ...s.inventory };
       this.selectedTrap = s.selectedTrap;
+      this.starT = s.starT || 0;
+      this.hiddenT = s.hiddenT || 0;
+      this.dancing = !!s.dancing;
+      this.danceHealT = s.danceHealT || 0;
     }
   }
 

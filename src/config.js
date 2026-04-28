@@ -3,25 +3,25 @@
   const G = (window.G = window.G || {});
 
   G.config = {
-    TILE: 32,
+    TILE: 48,
     ARENA_W: 24,
     ARENA_H: 18,
     get ARENA_PX_W() { return this.ARENA_W * this.TILE; },
     get ARENA_PX_H() { return this.ARENA_H * this.TILE; },
 
-    CANVAS_W: 768,
-    CANVAS_H: 608,
+    CANVAS_W: 960,
+    CANVAS_H: 720,
     SPLIT_GAP: 4,
     get VIEWPORT_W() { return this.CANVAS_W; },
     get VIEWPORT_H() { return (this.CANVAS_H - this.SPLIT_GAP) / 2; },
 
-    PLAYER_SPEED: 180,
-    PLAYER_HITBOX: 20,
-    SLIDE_SPEED: 360,
+    PLAYER_SPEED: 234,
+    PLAYER_HITBOX: 30,
+    SLIDE_SPEED: 468,
 
     PLAYER_MAX_HP: 5,
     INVINCIBILITY_AFTER_HIT: 0.8,
-    TRAP_LIMIT_PER_PLAYER: 5,
+    TRAP_LIMIT_PER_PLAYER: 10,
 
     PICKUP_SPAWN_MIN: 4.0,
     PICKUP_SPAWN_MAX: 6.0,
@@ -29,8 +29,22 @@
     INVENTORY_MAX_PER_TYPE: 3,
 
     TRAP_TYPES: ['mousetrap', 'puddle', 'firecracker', 'trapdoor', 'banana'],
+    POWERUP_TYPES: ['star', 'broom', 'boombox'],
+    POWERUP_SPAWN_CHANCE: 0.075,   // шанс power-up вместо ловушки (в 4 раза реже)
+    NIGHT_DAY_DURATION: 120.0,      // сколько длится день перед ночью
+    NIGHT_DURATION: 60.0,           // длительность ночи
+    FLASHLIGHT_TILES: 3,            // дальность фонарика в тайлах
+    STAR_DURATION: 10.0,           // секунды бессмертия
+    STAR_SPEED_MUL: 2.0,           // множитель скорости
+    STAR_MUSIC_SPEED_MUL: 1.35,    // насколько ускоряется музыка под звездой
+    STAR_TOUCH_COOLDOWN: 0.5,      // повторный урон от касания не чаще
+    BROOM_HIDDEN: 5.0,             // секунды невидимости
+    BROOM_DUST_TILES: 3,           // размер пылевого квадрата
+    BROOM_DUST_LIFETIME: 1.5,      // длительность пылевого облака
+    BOOMBOX_HEAL_INTERVAL: 2.0,    // каждые сколько секунд +1 HP
+    BOOMBOX_HEAL_AMOUNT: 1,
     TRAP_ARM_DELAY: 0.4,
-    FIRECRACKER_FUSE: 1.5,
+    FIRECRACKER_FUSE: 1.05,
     FIRECRACKER_RADIUS_TILES: 3.0,
     PUDDLE_LIFETIME: 8.0,
     TRAPDOOR_FALL_TIME: 2.0,
@@ -100,30 +114,30 @@
     raccoonM:  '#1a1a1a',
     raccoonN:  '#202020',
     // Мышеловка
-    mousetrap: '#a07040',
-    mtDark:    '#5a3818',
-    mtSpring:  '#cccccc',
+    mousetrap: '#c8853c',
+    mtDark:    '#6a3b16',
+    mtSpring:  '#f4f4f4',
     mtSprDark: '#7a7a7a',
-    cheese:    '#ffcc44',
+    cheese:    '#ffd84a',
     // Лужа
-    puddle:    '#4a8acc',
-    puddleHi:  '#9addff',
-    puddleDark:'#2a5a8a',
+    puddle:    '#35a9ff',
+    puddleHi:  '#d8f7ff',
+    puddleDark:'#166db0',
     // Петарда / динамит
-    firework:  '#cc2222',
-    fireworkD: '#7a1010',
-    fireworkY: '#ffcc22',
+    firework:  '#f04444',
+    fireworkD: '#811515',
+    fireworkY: '#ffe24a',
     fuseBrown: '#5a3a1a',
     sparkY:    '#fff04a',
     sparkO:    '#ff8822',
     // Люк (manhole)
-    trapdoor:  '#3a3a3a',
-    trapdoorH: '#1a1a1a',
-    trapdoorR: '#5a5a5a',
+    trapdoor:  '#59616b',
+    trapdoorH: '#20262d',
+    trapdoorR: '#9ca8b6',
     // Банан
-    banana:    '#f4d836',
-    bananaD:   '#a87c10',
-    bananaH:   '#fff0a0',
+    banana:    '#ffe04a',
+    bananaD:   '#b87912',
+    bananaH:   '#fff8b8',
     heart:     '#ee2244',
     heartDark: '#882233',
     text:      '#ffffff',
@@ -133,5 +147,18 @@
     explosion: '#ff8822',
     explosionY:'#ffee44',
     pickupGlow:'#ffee88',
+    // Power-ups
+    starY:     '#ffe838',
+    starO:     '#ff9410',
+    starHi:    '#fff8c0',
+    broomB:    '#5a9cff',
+    broomH:    '#ffd36a',
+    broomD:    '#7b4a18',
+    boomboxB:  '#29306f',
+    boomboxS:  '#77e6ff',
+    boomboxA:  '#171a34',
+    boomboxK:  '#ff5cc8',
+    dust:      '#d4c8a0',
+    dustDark:  '#7a6a4a',
   };
 })();

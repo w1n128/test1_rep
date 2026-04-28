@@ -46,6 +46,42 @@
   }
 
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function tileKey(tx, ty) { return tx + ',' + ty; }
+  function pxToTile(v) { return Math.floor(v / C.TILE); }
+  function dirVec(dir) {
+    if (dir === 'left') return { x: -1, y: 0 };
+    if (dir === 'right') return { x: 1, y: 0 };
+    if (dir === 'up') return { x: 0, y: -1 };
+    return { x: 0, y: 1 };
+  }
+  function nightState(matchTime) {
+    const cycle = C.NIGHT_DAY_DURATION + C.NIGHT_DURATION;
+    const phase = ((matchTime % cycle) + cycle) % cycle;
+    const active = phase >= C.NIGHT_DAY_DURATION;
+    const remaining = active ? cycle - phase : C.NIGHT_DAY_DURATION - phase;
+    return { active, remaining };
+  }
+  function buildLightTiles(viewer) {
+    const lit = new Set();
+    let tx = viewer.tileX;
+    let ty = viewer.tileY;
+    lit.add(tileKey(tx, ty));
+    const d = dirVec(viewer.dir);
+    for (let i = 0; i < C.FLASHLIGHT_TILES; i++) {
+      tx += d.x;
+      ty += d.y;
+      if (tx < 0 || ty < 0 || tx >= C.ARENA_W || ty >= C.ARENA_H) break;
+      if (G.arena.isSolidTile(tx, ty)) break;
+      lit.add(tileKey(tx, ty));
+    }
+    return lit;
+  }
+  function isLitTile(lit, tx, ty) {
+    return !lit || lit.has(tileKey(tx, ty));
+  }
+  function isLitPx(lit, x, y) {
+    return isLitTile(lit, pxToTile(x), pxToTile(y));
+  }
 
   function isTrapVisible(trap, viewerId) {
     // Банан во время полёта (armDelay > 0) не показываем никому — будет проектил.
@@ -56,9 +92,12 @@
     return true;
   }
 
-  function drawTraps(ctx, traps, viewerId, time) {
+  function drawTraps(ctx, traps, viewerId, time, litTiles) {
+    const trapDrawSize = Math.round(C.TILE * 2 / 3);
+    const trapDrawOff = (C.TILE - trapDrawSize) / 2;
     for (const trap of traps.list) {
       if (!isTrapVisible(trap, viewerId)) continue;
+      if (!isLitTile(litTiles, trap.tileX, trap.tileY)) continue;
       const sprite = G.sprites.traps[trap.type];
       const px = trap.tileX * C.TILE;
       const py = trap.tileY * C.TILE;
@@ -70,7 +109,7 @@
         alpha = blink ? 1 : 0.7;
       }
       ctx.globalAlpha = alpha;
-      ctx.drawImage(sprite, px, py);
+      ctx.drawImage(sprite, px + trapDrawOff, py + trapDrawOff, trapDrawSize, trapDrawSize);
       ctx.globalAlpha = 1;
       // Контур люка для владельца — чтобы помнить, где поставил
       if (trap.type === 'trapdoor' && trap.ownerId === viewerId) {
@@ -81,12 +120,13 @@
     }
   }
 
-  function drawPickups(ctx, pickups, time) {
+  function drawPickups(ctx, pickups, time, litTiles) {
     const bgW = G.sprites.pickupBg.width;
     const bgOff = (C.TILE - bgW) / 2;
-    const iconSize = C.TILE / 2;
+    const iconSize = 17;
     const iconOff = (C.TILE - iconSize) / 2;
     for (const pk of pickups.list) {
+      if (!isLitTile(litTiles, pk.tileX, pk.tileY)) continue;
       const px = pk.tileX * C.TILE;
       const py = pk.tileY * C.TILE;
       const bob = Math.sin(pk.animT * 4) * 1.5;
@@ -98,14 +138,16 @@
     }
   }
 
-  function drawEffects(ctx, effects) {
+  function drawEffects(ctx, effects, litTiles) {
     for (const eff of effects) {
       if (eff.kind === 'explosion') {
+        if (!isLitPx(litTiles, eff.x, eff.y)) continue;
         const frames = G.sprites.explosion;
         const idx = Math.min(frames.length - 1, Math.floor(eff.t / eff.lifetime * frames.length));
         const sprite = frames[idx];
         ctx.drawImage(sprite, eff.x - sprite.width / 2, eff.y - sprite.height / 2);
       } else if (eff.kind === 'snap') {
+        if (!isLitPx(litTiles, eff.x, eff.y)) continue;
         ctx.fillStyle = `rgba(255,255,255,${1 - eff.t / eff.lifetime})`;
         ctx.beginPath();
         ctx.arc(eff.x, eff.y, 12 + eff.t * 64, 0, Math.PI * 2);
@@ -116,8 +158,9 @@
         // Параболическая дуга: пиковая высота 28 px в середине
         const arc = 28 * Math.sin(a * Math.PI);
         const y = eff.fromY + (eff.toY - eff.fromY) * a - arc;
+        if (!isLitPx(litTiles, x, y)) continue;
         const sprite = G.sprites.traps.banana;
-        const size = 24;
+        const size = 15;
         // Лёгкое вращение через scaleX знак
         const flip = (Math.floor(eff.t * 16) % 2) ? -1 : 1;
         ctx.save();
@@ -129,19 +172,48 @@
     }
   }
 
-  function drawPlayer(ctx, p, viewer, time) {
+  function drawPlayer(ctx, p, viewer, time, litTiles) {
     if (p.fallen > 0) {
+      if (p.id !== viewer.id && !isLitPx(litTiles, p.x, p.y)) return;
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
       ctx.beginPath();
       ctx.ellipse(p.x, p.y + 6, 10, 3, 0, 0, Math.PI * 2);
       ctx.fill();
       return;
     }
-    if (p.invincibility > 0 && Math.floor(time * 16) % 2 === 0) return;
+    if (p.invincibility > 0 && p.starT <= 0 && Math.floor(time * 16) % 2 === 0) return;
     if (!p.alive) return;
+    if (p.id !== viewer.id && !isLitPx(litTiles, p.x, p.y)) return;
+
+    // Невидимость от метлы: для чужого viewer полностью скрыт
+    if (p.hiddenT > 0 && viewer && viewer.id !== p.id) {
+      // лёгкий мерцающий «шорох» вокруг — намёк, где может быть
+      if (Math.floor(time * 4) % 2 === 0) {
+        ctx.fillStyle = 'rgba(180,168,130,0.18)';
+        ctx.fillRect(p.x - 6, p.y - 4, 12, 8);
+      }
+      return;
+    }
+
+    // Свечение звезды: золотой ореол + лёгкая тёмно-оранжевая обводка
+    if (p.starT > 0) {
+      const pulse = 0.55 + 0.25 * Math.sin(time * 12);
+      const half = C.TILE / 2;
+      const grad = ctx.createRadialGradient(p.x, p.y, half * 0.4, p.x, p.y, half * 1.05);
+      grad.addColorStop(0, `rgba(255, 232, 56, ${0.45 * pulse})`);
+      grad.addColorStop(1, 'rgba(255, 148, 16, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, half * 1.05, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Свой игрок под метлой — полупрозрачный (видит сам себя как «призрак»)
+    let alpha = 1;
+    if (p.hiddenT > 0) alpha = 0.55;
+    if (p.starT > 0 && Math.floor(time * 12) % 2 === 0) alpha = Math.min(alpha, 0.38);
 
     // Скрытность Енота: для камеры Дворника после паузы становится прозрачным
-    let alpha = 1;
     if (
       p.character === 'raccoon' &&
       viewer && viewer.id !== p.id &&
@@ -150,12 +222,14 @@
     ) {
       const fade = (p.idleT - C.STEALTH_IDLE_TIME) / C.STEALTH_FADE_TIME;
       if (fade >= 1) return; // полностью невидим
-      alpha = 1 - fade * 0.92; // оставим лёгкий призрак
+      alpha = Math.min(alpha, 1 - fade * 0.92);
     }
 
     const sprites = G.sprites[p.character];
     let frame;
-    if (p.sliding) {
+    if (p.dancing && sprites.dance) {
+      frame = sprites.dance[Math.floor(time / 0.5) % sprites.dance.length];
+    } else if (p.sliding) {
       frame = sprites['slide_' + p.dir] || sprites[p.dir][0];
     } else if (p.throwT > 0) {
       frame = sprites['throw_' + p.dir] || sprites[p.dir][0];
@@ -167,15 +241,51 @@
         frame = anim[idx];
       }
     }
-    const half = C.TILE / 2;
+    const visualScale = p.character === 'raccoon' ? 0.8 : 1;
+    const drawW = Math.round(C.TILE * visualScale);
+    const drawH = Math.round(C.TILE * visualScale);
+    const drawX = Math.round(p.x - drawW / 2);
+    const drawY = Math.round(p.y - drawH / 2);
     if (alpha < 1) ctx.globalAlpha = alpha;
-    ctx.drawImage(frame, Math.round(p.x - half), Math.round(p.y - half));
+    ctx.drawImage(frame, drawX, drawY, drawW, drawH);
     if (alpha < 1) ctx.globalAlpha = 1;
+    if (p.starT > 0 && Math.floor(time * 12) % 2 === 1) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.32;
+      ctx.drawImage(frame, drawX, drawY, drawW, drawH);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    }
   }
 
-  function drawViewport(ctx, viewer, players, traps, pickups, x, y, w, h, time) {
+  function drawNightOverlay(ctx, litTiles) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(5, 12, 38, 0.56)';
+    ctx.fillRect(0, 0, C.ARENA_PX_W, C.ARENA_PX_H);
+    ctx.globalCompositeOperation = 'screen';
+    for (const key of litTiles) {
+      const parts = key.split(',');
+      const tx = Number(parts[0]);
+      const ty = Number(parts[1]);
+      const px = tx * C.TILE;
+      const py = ty * C.TILE;
+      const grad = ctx.createRadialGradient(
+        px + C.TILE / 2, py + C.TILE / 2, C.TILE * 0.12,
+        px + C.TILE / 2, py + C.TILE / 2, C.TILE * 0.78
+      );
+      grad.addColorStop(0, 'rgba(255, 244, 170, 0.34)');
+      grad.addColorStop(1, 'rgba(255, 244, 170, 0.04)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(px, py, C.TILE, C.TILE);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
+  }
+
+  function drawViewport(ctx, viewer, players, traps, pickups, x, y, w, h, time, night) {
     const camX = clamp(viewer.x - w / 2, 0, Math.max(0, C.ARENA_PX_W - w));
     const camY = clamp(viewer.y - h / 2, 0, Math.max(0, C.ARENA_PX_H - h));
+    const litTiles = night.active ? buildLightTiles(viewer) : null;
 
     ctx.save();
     ctx.beginPath();
@@ -184,21 +294,43 @@
 
     ctx.translate(x - Math.round(camX), y - Math.round(camY));
 
+    if (night.active) ctx.filter = 'saturate(50%)';
+
     // Запечённый мир
     ctx.drawImage(worldCanvas, 0, 0);
 
     // Динамика
-    drawPickups(ctx, pickups, time);
-    drawTraps(ctx, traps, viewer.id, time);
-    drawEffects(ctx, traps.effects);
-    if (G.particles) G.particles.draw(ctx);
-    for (const p of players) drawPlayer(ctx, p, viewer, time);
+    drawPickups(ctx, pickups, time, litTiles);
+    drawTraps(ctx, traps, viewer.id, time, litTiles);
+    drawEffects(ctx, traps.effects, litTiles);
+    if (G.particles) G.particles.draw(ctx, litTiles ? ((px, py) => isLitPx(litTiles, px, py)) : null);
+    for (const p of players) drawPlayer(ctx, p, viewer, time, litTiles);
+    if (night.active) {
+      ctx.filter = 'none';
+      drawNightOverlay(ctx, litTiles);
+    }
 
     ctx.restore();
   }
 
-  function drawSplitScreen(ctx, players, traps, pickups, time) {
+  function drawNightHud(ctx, night, x, y, w) {
+    if (!night.active) return;
+    const label = 'НОЧЬ ' + Math.ceil(night.remaining) + 'с';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.font = 'bold 12px monospace';
+    const tx = x + w / 2;
+    ctx.fillStyle = 'rgba(5,12,38,0.78)';
+    ctx.fillRect(tx - 42, y + 78, 84, 18);
+    ctx.strokeStyle = 'rgba(160,224,255,0.5)';
+    ctx.strokeRect(tx - 42.5, y + 78.5, 83, 17);
+    ctx.fillStyle = '#a0e0ff';
+    ctx.fillText(label, tx, y + 81);
+  }
+
+  function drawSplitScreen(ctx, players, traps, pickups, time, matchTime = 0) {
     const C_ = C;
+    const night = nightState(matchTime);
     const vw = C_.VIEWPORT_W;
     const vh = C_.VIEWPORT_H;
     const gap = C_.SPLIT_GAP;
@@ -213,30 +345,34 @@
     ctx.fillStyle = G.PALETTE.splitBar;
     ctx.fillRect(0, vh, C_.CANVAS_W, gap);
 
-    drawViewport(ctx, players[0], players, traps, pickups, 0, 0, vw, vh, time);
-    drawViewport(ctx, players[1], players, traps, pickups, 0, vh + gap, vw, vh, time);
+    drawViewport(ctx, players[0], players, traps, pickups, 0, 0, vw, vh, time, night);
+    drawViewport(ctx, players[1], players, traps, pickups, 0, vh + gap, vw, vh, time, night);
 
     if (sx || sy) ctx.restore();
 
     // HUD поверх (без шейка)
     G.hud.drawHUD(ctx, players[0], players, traps, pickups, 0, 0, vw, vh);
     G.hud.drawHUD(ctx, players[1], players, traps, pickups, 0, vh + gap, vw, vh);
+    drawNightHud(ctx, night, 0, 0, vw);
+    drawNightHud(ctx, night, 0, vh + gap, vw);
   }
 
-  function drawSingleScreen(ctx, viewer, players, traps, pickups, time) {
+  function drawSingleScreen(ctx, viewer, players, traps, pickups, time, matchTime = 0) {
     const C_ = C;
+    const night = nightState(matchTime);
     const [sx, sy] = shakeOffset();
     if (sx || sy) {
       ctx.save();
       ctx.translate(Math.round(sx), Math.round(sy));
     }
 
-    drawViewport(ctx, viewer, players, traps, pickups, 0, 0, C_.CANVAS_W, C_.CANVAS_H, time);
+    drawViewport(ctx, viewer, players, traps, pickups, 0, 0, C_.CANVAS_W, C_.CANVAS_H, time, night);
 
     if (sx || sy) ctx.restore();
 
     // HUD на полную ширину
     G.hud.drawHUD(ctx, viewer, players, traps, pickups, 0, 0, C_.CANVAS_W, C_.CANVAS_H);
+    drawNightHud(ctx, night, 0, 0, C_.CANVAS_W);
   }
 
   G.render = { init, drawSplitScreen, drawSingleScreen, shake, updateShake };

@@ -193,12 +193,20 @@
         const cy = next[1] * C.TILE + C.TILE / 2;
         const dx = cx - this.player.x;
         const dy = cy - this.player.y;
-        if (Math.abs(dx) <= 2 && Math.abs(dy) <= 2) {
+        const arrive = Math.max(3, C.PLAYER_SPEED * dt * 1.1);
+        if (Math.abs(dx) <= arrive && Math.abs(dy) <= arrive) {
+          this.player.x = cx;
+          this.player.y = cy;
           this.path.shift();
           return;
         }
-        if (Math.abs(dx) > 1) this._actions[dx > 0 ? 'right' : 'left'] = true;
-        if (Math.abs(dy) > 1) this._actions[dy > 0 ? 'down' : 'up'] = true;
+        if (Math.abs(dx) > Math.abs(dy)) {
+          this._actions[dx > 0 ? 'right' : 'left'] = true;
+          if (Math.abs(dy) > 6) this._actions[dy > 0 ? 'down' : 'up'] = true;
+        } else {
+          this._actions[dy > 0 ? 'down' : 'up'] = true;
+          if (Math.abs(dx) > 6) this._actions[dx > 0 ? 'right' : 'left'] = true;
+        }
       }
     }
   }
