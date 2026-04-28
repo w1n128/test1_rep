@@ -108,10 +108,8 @@
       if (conn) {
         c.close(); return; // только 1 клиент
       }
-      c.on('open', () => {
-        setupConn(c);
-        if (onConnectedCb) onConnectedCb();
-      });
+      setupConn(c);
+      if (onConnectedCb) onConnectedCb();
     });
     peer.on('error', (err) => {
       lastError = err;
@@ -131,19 +129,29 @@
     const targetId = ROOM_PREFIX + roomCode;
     const myId = ROOM_PREFIX + roomCode + '-c-' + Math.random().toString(36).slice(2, 7);
     peer = ensurePeer(myId);
+    const timeout = setTimeout(() => {
+      if (!conn || !conn.open) {
+        const err = { type: 'timeout' };
+        lastError = err;
+        if (opts.onError) opts.onError(err);
+      }
+    }, 10000);
     peer.on('open', () => {
       const c = peer.connect(targetId, { reliable: true });
       c.on('open', () => {
+        clearTimeout(timeout);
         setupConn(c);
         if (onConnectedCb) onConnectedCb();
         if (opts.onReady) opts.onReady(roomCode);
       });
       c.on('error', (err) => {
+        clearTimeout(timeout);
         lastError = err;
         if (opts.onError) opts.onError(err);
       });
     });
     peer.on('error', (err) => {
+      clearTimeout(timeout);
       lastError = err;
       if (opts.onError) opts.onError(err);
     });

@@ -283,6 +283,7 @@
       onError: (err) => {
         const t = err && err.type ? err.type : '';
         if (t === 'peer-unavailable') lobbyStatus = 'Комнаты с таким кодом нет';
+        else if (t === 'timeout') lobbyStatus = 'Не удалось подключиться за 10 сек. Проверьте код и обновите страницу.';
         else lobbyStatus = 'Ошибка: ' + (t || err);
       },
     });
