@@ -71,6 +71,36 @@
     src.start(t0);
   }
 
+  function windHowl(dur = 2.0, when = 0) {
+    const t0 = ctx.currentTime + when;
+    const sr = ctx.sampleRate;
+    const len = Math.max(1, Math.floor(sr * dur));
+    const buf = ctx.createBuffer(1, len, sr);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(520, t0);
+    filter.frequency.linearRampToValueAtTime(920, t0 + 0.65);
+    filter.frequency.linearRampToValueAtTime(360, t0 + 1.35);
+    filter.frequency.linearRampToValueAtTime(700, t0 + dur);
+    filter.Q.value = 2.8;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(0.22, t0 + 0.18);
+    g.gain.linearRampToValueAtTime(0.16, t0 + 1.55);
+    g.gain.exponentialRampToValueAtTime(0.0005, t0 + dur);
+    src.connect(filter);
+    filter.connect(g);
+    g.connect(sfxGain);
+    src.start(t0);
+    src.stop(t0 + dur + 0.05);
+    tone(210, 1.3, 'sine', 0.05, when + 0.1, 135);
+    tone(430, 0.9, 'sine', 0.035, when + 0.75, 260);
+  }
+
   // Пицц-нота с быстрой атакой и затуханием — для бас-линии и марионеточного «мяуу».
   function pluck(freq, dur, vol = 0.18, when = 0, dest = 'music') {
     const t0 = ctx.currentTime + when;
@@ -142,6 +172,32 @@
       case 'pickup':
         tone(880, 0.07, 'sine', 0.16);
         tone(1320, 0.08, 'sine', 0.16, 0.07);
+        break;
+      case 'pickup_powerup':
+        tone(990, 0.06, 'sine', 0.13);
+        tone(1320, 0.07, 'sine', 0.13, 0.05);
+        tone(1760, 0.10, 'sine', 0.14, 0.11);
+        break;
+      case 'pickup_mousetrap':
+        tone(1600, 0.035, 'square', 0.12);
+        tone(700, 0.05, 'square', 0.08, 0.035, 520);
+        break;
+      case 'pickup_puddle':
+        noise(0.10, 0.08, 1300);
+        tone(520, 0.07, 'sine', 0.06, 0.04, 760);
+        break;
+      case 'pickup_firecracker':
+        tone(880, 0.04, 'square', 0.11);
+        noise(0.09, 0.06, 3200, 0.03);
+        tone(180, 0.06, 'triangle', 0.08, 0.06, 120);
+        break;
+      case 'pickup_trapdoor':
+        tone(170, 0.08, 'sine', 0.12, 0, 90);
+        noise(0.07, 0.05, 600, 0.03);
+        break;
+      case 'pickup_banana':
+        tone(740, 0.07, 'triangle', 0.10);
+        tone(980, 0.06, 'triangle', 0.08, 0.05, 620);
         break;
       case 'place':
         tone(220, 0.08, 'square', 0.12);
@@ -222,13 +278,16 @@
         tone(2400, 0.12, 'sine', 0.10, 0.13);
         break;
       case 'event_wind':
-        noise(0.45, 0.16, 1800);
-        tone(260, 0.30, 'sine', 0.08, 0, 520);
+        if (!canPlay('event_wind', 1700)) return;
+        windHowl(2.0);
         break;
       case 'event_trash':
-        noise(0.30, 0.18, 900);
+        if (!canPlay('event_trash', 600)) return;
+        noise(0.65, 0.20, 900);
         tone(180, 0.10, 'square', 0.12, 0.04, 90);
-        tone(220, 0.10, 'square', 0.10, 0.16, 120);
+        tone(260, 0.08, 'square', 0.10, 0.16, 130);
+        tone(120, 0.12, 'triangle', 0.12, 0.30, 70);
+        tone(520, 0.05, 'square', 0.08, 0.42, 300);
         break;
       case 'menu':
         tone(660, 0.06, 'square', 0.1);

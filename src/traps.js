@@ -222,16 +222,13 @@
           fx.particles('burstStars', player.x + 8, player.y - 8);
         }
       } else if (trap.type === 'puddle') {
-        if (!player.sliding) {
-          const d = dirVec(player.dir);
-          if (d.x !== 0 || d.y !== 0) {
-            player.sliding = { dx: d.x, dy: d.y };
-            player.slideT = C.SLIDE_MIN_TIME;
-            fx.audio('splash');
-            fx.audio('trap_puddle_hit');
-            fx.particles('burstSplash', cx, cy);
-            this.effects.push({ kind: 'wet', x: player.x, y: player.y - 14, t: 0, lifetime: 0.55 });
-          }
+        if (player.puddleT <= 0) {
+          player.splashInPuddle();
+          trap.destroyed = true;
+          fx.audio('splash');
+          fx.audio('trap_puddle_hit');
+          fx.particles('burstSplash', cx, cy);
+          this.effects.push({ kind: 'wet', x: player.x, y: player.y - 14, t: 0, lifetime: 0.55 });
         }
       } else if (trap.type === 'banana') {
         if (!player.sliding) {

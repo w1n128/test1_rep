@@ -40,11 +40,22 @@
       }
       return false;
     }
+    randomPowerupType() {
+      const weights = C.POWERUP_WEIGHTS || {};
+      let total = 0;
+      for (const type of C.POWERUP_TYPES) total += weights[type] || 1;
+      let r = Math.random() * total;
+      for (const type of C.POWERUP_TYPES) {
+        r -= weights[type] || 1;
+        if (r <= 0) return type;
+      }
+      return C.POWERUP_TYPES[0];
+    }
     spawnRandom() {
       // С шансом POWERUP_SPAWN_CHANCE — power-up, иначе обычная ловушка.
       let type;
       if (Math.random() < C.POWERUP_SPAWN_CHANCE) {
-        type = C.POWERUP_TYPES[Math.floor(Math.random() * C.POWERUP_TYPES.length)];
+        type = this.randomPowerupType();
       } else {
         type = C.TRAP_TYPES[Math.floor(Math.random() * C.TRAP_TYPES.length)];
       }
@@ -75,11 +86,11 @@
             // Power-up: активируется мгновенно
             player.activatePowerup(pk.type);
             this.list = this.list.filter((p) => p !== pk);
-            G.fx.audio('pickup');
+            G.fx.audio('pickup_powerup');
             G.fx.particles('burstStars', player.x, player.y - 8);
           } else if (player.addPickup(pk.type)) {
             this.list = this.list.filter((p) => p !== pk);
-            G.fx.audio('pickup');
+            G.fx.audio('pickup_' + pk.type);
             G.fx.particles('burstStars', player.x, player.y - 8);
           }
         }

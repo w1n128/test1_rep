@@ -76,6 +76,8 @@
       this.repathT = 0;
       this.switchCD = 0;
       this.placeCD = 0;
+      this.matchT = 0;
+      this.baitCD = C.AI_BAIT_START_DELAY;
       this._actions = {};
       this._justPressed = {};
     }
@@ -121,8 +123,15 @@
         const ox = this.opponent.tileX, oy = this.opponent.tileY;
         const dOp = Math.abs(ox - px) + Math.abs(oy - py);
         const bait = this.player.character === 'raccoon' ? 'pizza' : 'diamond';
-        if (this.player.inventory[bait] > 0 && dOp >= 7 && Math.random() < 0.28) {
+        if (
+          this.matchT >= C.AI_BAIT_START_DELAY &&
+          this.baitCD <= 0 &&
+          this.player.inventory[bait] > 0 &&
+          dOp >= C.AI_BAIT_MIN_DISTANCE &&
+          Math.random() < C.AI_BAIT_USE_CHANCE
+        ) {
           this.placeIntent = { type: bait, atTile: [px, py] };
+          this.baitCD = C.AI_BAIT_COOLDOWN;
           this.path = [];
           return;
         }
@@ -157,9 +166,11 @@
       this._justPressed = {};
       if (!this.player || !this.player.alive || this.player.fallen > 0) return;
 
+      this.matchT += dt;
       this.repathT -= dt;
       this.switchCD = Math.max(0, this.switchCD - dt);
       this.placeCD = Math.max(0, this.placeCD - dt);
+      this.baitCD = Math.max(0, this.baitCD - dt);
 
       if (this.repathT <= 0 || (this.path.length === 0 && !this.placeIntent)) {
         this.decide();

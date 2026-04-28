@@ -107,7 +107,7 @@
     const right = viewportX + viewportW - 8;
     const invY = viewportY + 4;
 
-    const types = C.ITEM_TYPES;
+    const types = player.itemTypes ? player.itemTypes() : C.ITEM_TYPES;
     for (let i = 0; i < types.length; i++) {
       const x = right - (types.length - i) * (slotW + slotGap);
       const isActive = player.selectedTrap === i;

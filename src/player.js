@@ -15,6 +15,7 @@
       this.hp = C.PLAYER_MAX_HP;
       this.invincibility = 0;
       this.sliding = null;        // { dx, dy }
+      this.puddleT = 0;           // барахтанье в луже
       this.fallen = 0;            // секунды в люке
       this.fallReturnAt = null;   // позиция возврата
       this.alive = true;
@@ -45,8 +46,14 @@
     get tileX() { return Math.floor(this.x / C.TILE); }
     get tileY() { return Math.floor(this.y / C.TILE); }
 
+    itemTypes() {
+      const bait = this.character === 'janitor' ? 'diamond' : 'pizza';
+      return C.TRAP_TYPES.concat([bait]);
+    }
+
     selectedType() {
-      return C.ITEM_TYPES[this.selectedTrap];
+      const types = this.itemTypes();
+      return types[this.selectedTrap] || types[0];
     }
 
     addPickup(type) {
@@ -63,6 +70,7 @@
       this.hp = Math.max(0, this.hp - amount);
       this.invincibility = C.INVINCIBILITY_AFTER_HIT;
       this.sliding = null;
+      this.puddleT = 0;
       if (window.G && window.G.audio) {
         window.G.audio.play(this.character === 'raccoon' ? 'hurt_raccoon' : 'hurt_janitor');
       }
@@ -108,6 +116,15 @@
       this.fallen = C.TRAPDOOR_FALL_TIME;
       this.fallReturnAt = { x: this.x, y: this.y };
       this.sliding = null;
+      this.puddleT = 0;
+    }
+
+    splashInPuddle() {
+      if (this.fallen > 0) return;
+      this.sliding = null;
+      this.puddleT = C.PUDDLE_STUCK_TIME;
+      this.moving = false;
+      this.walkT = 0;
     }
 
     update(dt, traps) {
@@ -120,6 +137,17 @@
         this.starTouchT = Math.max(0, this.starTouchT - dt);
       }
       if (this.hiddenT > 0) this.hiddenT = Math.max(0, this.hiddenT - dt);
+
+      if (this.puddleT > 0) {
+        this.puddleT = Math.max(0, this.puddleT - dt);
+        this.walkT += dt * 6;
+        this.moving = false;
+        if (window.G && window.G.particles && Math.random() < 0.35) {
+          window.G.particles.burstSplash(this.x, this.y + 8);
+        }
+        this.input.consume && this.input.consume();
+        return;
+      }
 
       // === Танец под магнитофон: блокирует движение, лечит ===
       if (this.dancing) {
@@ -157,7 +185,7 @@
         return;
       }
 
-      // Скольжение по луже / банану
+      // Скольжение по банану
       if (this.sliding) {
         const speed = C.SLIDE_SPEED;
         const stepX = this.sliding.dx * speed * dt;
@@ -229,10 +257,10 @@
 
       // Действия
       if (this.input.wasPressed && this.input.wasPressed('switchNext')) {
-        this.selectedTrap = (this.selectedTrap + 1) % C.ITEM_TYPES.length;
+        this.selectedTrap = (this.selectedTrap + 1) % this.itemTypes().length;
       }
       if (this.input.wasPressed && this.input.wasPressed('switchPrev')) {
-        const n = C.ITEM_TYPES.length;
+        const n = this.itemTypes().length;
         this.selectedTrap = (this.selectedTrap - 1 + n) % n;
       }
       if (this.input.wasPressed && this.input.wasPressed('place')) {
@@ -263,6 +291,7 @@
         hp: this.hp,
         invincibility: this.invincibility,
         sliding: this.sliding,
+        puddleT: this.puddleT,
         fallen: this.fallen,
         alive: this.alive,
         walkT: this.walkT,
@@ -283,6 +312,7 @@
       this.hp = s.hp;
       this.invincibility = s.invincibility;
       this.sliding = s.sliding;
+      this.puddleT = s.puddleT || 0;
       this.fallen = s.fallen;
       this.alive = s.alive;
       this.walkT = s.walkT;

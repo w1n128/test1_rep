@@ -311,6 +311,8 @@
     let frame;
     if (p.dancing && sprites.dance) {
       frame = sprites.dance[Math.floor(time / 0.5) % sprites.dance.length];
+    } else if (p.puddleT > 0) {
+      frame = sprites['slide_' + p.dir] || sprites[p.dir][0];
     } else if (p.sliding) {
       frame = sprites['slide_' + p.dir] || sprites[p.dir][0];
     } else if (p.throwT > 0) {
