@@ -27,6 +27,7 @@
       this.attackT = 0;
       this.slideT = 0;
       this.inventory = { mousetrap: 0, firecracker: 0, trapdoor: 0, banana: 0, branch: 0, cone: 0, pizza: 0, diamond: 0 };
+      this.branchHits = 0;
       this.selectedTrap = 0;
       // Power-up состояния
       this.starT = 0;           // звезда: бессмертие + 2x скорость
@@ -39,6 +40,8 @@
       this.inventory.firecracker = 1;
       this.inventory.trapdoor = 1;
       this.inventory.banana = 1;
+      this.inventory.branch = 1;
+      this.branchHits = C.MELEE_HITS_PER_BRANCH;
       if (this.character === 'janitor') this.inventory.diamond = 1;
       if (this.character === 'raccoon') this.inventory.pizza = 1;
     }
@@ -59,7 +62,8 @@
     addPickup(type) {
       if (type === 'branch') {
         if (this.inventory.branch > 0) return false;
-        this.inventory.branch = C.MELEE_HITS_PER_BRANCH;
+        this.inventory.branch = 1;
+        this.branchHits = C.MELEE_HITS_PER_BRANCH;
         return true;
       }
       if (this.inventory[type] >= C.INVENTORY_MAX_PER_TYPE) return false;
@@ -269,9 +273,6 @@
       if (this.input.wasPressed && this.input.wasPressed('place')) {
         traps.tryPlace(this);
       }
-      if (this.input.wasPressed && this.input.wasPressed('attack')) {
-        traps.tryMelee(this);
-      }
 
       triggerTrapsAt(this, traps);
     }
@@ -306,6 +307,7 @@
         throwT: this.throwT,
         attackT: this.attackT,
         inventory: { ...this.inventory },
+        branchHits: this.branchHits,
         selectedTrap: this.selectedTrap,
         starT: this.starT,
         hiddenT: this.hiddenT,
@@ -328,6 +330,7 @@
       this.throwT = s.throwT || 0;
       this.attackT = s.attackT || 0;
       this.inventory = { ...s.inventory };
+      this.branchHits = s.branchHits || 0;
       this.selectedTrap = s.selectedTrap;
       this.starT = s.starT || 0;
       this.hiddenT = s.hiddenT || 0;

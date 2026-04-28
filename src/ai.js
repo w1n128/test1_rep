@@ -192,7 +192,7 @@
                 this.switchCD = 0.18;
               }
             } else {
-              this._justPressed.attack = true;
+              this._justPressed.place = true;
               this.placeCD = 0.45;
             }
             return;

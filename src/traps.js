@@ -125,7 +125,7 @@
     tryPlace(player) {
       const type = player.selectedType();
       if (player.inventory[type] <= 0) return false;
-      if (C.COMBAT_TYPES.indexOf(type) >= 0) return false;
+      if (C.COMBAT_TYPES.indexOf(type) >= 0) return this.tryMelee(player);
       if (C.BAIT_TYPES.indexOf(type) >= 0) return this.useBait(player, type);
       if (this.countByOwner(player.id) >= C.TRAP_LIMIT_PER_PLAYER) return false;
 
@@ -206,8 +206,10 @@
       if (!target) return false;
 
       if (type === 'branch') {
+        if (player.branchHits <= 0) return false;
         if (target.damage(1)) {
-          player.inventory.branch = Math.max(0, player.inventory.branch - 1);
+          player.branchHits = Math.max(0, player.branchHits - 1);
+          if (player.branchHits <= 0) player.inventory.branch = 0;
           if (G.fx) {
             G.fx.audio(target.character === 'raccoon' ? 'melee_hit_raccoon' : 'melee_hit_janitor');
             G.fx.shake(4, 0.14);

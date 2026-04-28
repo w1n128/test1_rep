@@ -25,12 +25,12 @@
 
   const p1 = new InputDevice('p1', {
     KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right',
-    KeyF: 'place', KeyR: 'attack',
+    KeyF: 'place',
     KeyQ: 'switchPrev', KeyE: 'switchNext',
   });
   const p2 = new InputDevice('p2', {
     ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
-    Period: 'place', Slash: 'attack', Comma: 'switchNext',
+    Period: 'place', Comma: 'switchNext',
   });
 
   // Глобальное меню/системные команды.
