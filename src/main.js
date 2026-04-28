@@ -403,11 +403,12 @@
           up: local.isDown('up'), down: local.isDown('down'),
           left: local.isDown('left'), right: local.isDown('right'),
           place: local.isDown('place'),
+          attack: local.isDown('attack'),
           switchNext: local.isDown('switchNext'),
           switchPrev: local.isDown('switchPrev'),
         };
         const justPressed = [];
-        for (const a of ['place', 'switchNext', 'switchPrev']) {
+        for (const a of ['place', 'attack', 'switchNext', 'switchPrev']) {
           if (local.wasPressed(a)) justPressed.push(a);
         }
         G.net.send({ t: 'input', actions, justPressed });
@@ -642,11 +643,11 @@
     ctx.font = '12px monospace';
     ctx.fillStyle = '#9c9';
     ctx.textAlign = 'center';
-    ctx.fillText('Управление 1: WASD движение, F поставить, Q/E переключить', cx, 470);
+    ctx.fillText('Управление 1: WASD движение, F поставить, R ударить, Q/E переключить', cx, 470);
     ctx.fillStyle = '#9cc';
-    ctx.fillText('Управление 2: стрелки, «,» переключить, «.» поставить', cx, 488);
+    ctx.fillText('Управление 2: стрелки, «.» поставить, «/» ударить, «,» переключить', cx, 488);
     ctx.fillStyle = '#ccc';
-    ctx.fillText('Enter / 1 / 2 / 3 — старт.  Esc — пауза.  M — в меню.  R — рестарт.', cx, 520);
+    ctx.fillText('Enter / 1 / 2 / 3 — старт.  Esc — пауза.  M — в меню.', cx, 520);
   }
 
   function drawNetSubmenu() {
@@ -793,7 +794,7 @@
     // Заголовок раздела
     ctx.font = 'bold 16px monospace';
     ctx.fillStyle = '#a0e0ff';
-    ctx.fillText('ЛОВУШКИ', cx, 108);
+    ctx.fillText('ЛОВУШКИ И ПРЕДМЕТЫ', cx, 108);
 
     // Список ловушек: иконка + название + описание
     const rules = [
@@ -801,11 +802,6 @@
         type: 'mousetrap',
         name: 'Мышеловка',
         desc: 'Срабатывает при наступании: урон 1, ломается. До 3 в инвентаре.',
-      },
-      {
-        type: 'puddle',
-        name: 'Лужа',
-        desc: 'Заставляет барахтаться 2 сек без движения, без урона. До 3 в инвентаре.',
       },
       {
         type: 'firecracker',
@@ -821,6 +817,16 @@
         type: 'banana',
         name: 'Банановая кожура',
         desc: 'Бросок на 3 тайла вперёд. Урон 1 + длинное скольжение без управления. До 3 в инвентаре.',
+      },
+      {
+        type: 'branch',
+        name: 'Ветка',
+        desc: 'Выберите и бейте R: 1 клетка перед собой, урон 1. Хватает на 3 попадания.',
+      },
+      {
+        type: 'cone',
+        name: 'Конус',
+        desc: 'Выберите и нажмите R: надевает конус на голову, стан 1.5 сек. Одноразовый.',
       },
     ];
 
@@ -853,9 +859,9 @@
     ctx.font = '12px monospace';
     ctx.fillStyle = '#9c9';
     const baseY = startY + rules.length * rowH + 14;
-    ctx.fillText('Управление 1 (Дворник): WASD движение, F поставить, Q/E переключить', cx, baseY);
+    ctx.fillText('Управление 1 (Дворник): WASD движение, F поставить, R ударить, Q/E переключить', cx, baseY);
     ctx.fillStyle = '#9cc';
-    ctx.fillText('Управление 2 (Енот): стрелки, «.» поставить, «,» переключить', cx, baseY + 18);
+    ctx.fillText('Управление 2 (Енот): стрелки, «.» поставить, «/» ударить, «,» переключить', cx, baseY + 18);
     ctx.fillStyle = '#ccc';
     ctx.fillText('Получил 5 ударов — проиграл. Активных ловушек одновременно: до 10.', cx, baseY + 40);
     ctx.fillStyle = '#a0e0ff';

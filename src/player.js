@@ -15,7 +15,7 @@
       this.hp = C.PLAYER_MAX_HP;
       this.invincibility = 0;
       this.sliding = null;        // { dx, dy }
-      this.puddleT = 0;           // барахтанье в луже
+      this.coneT = 0;             // конус на голове: стан
       this.fallen = 0;            // секунды в люке
       this.fallReturnAt = null;   // позиция возврата
       this.alive = true;
@@ -24,8 +24,9 @@
       this.idleT = 0;
       this.stepT = 0;
       this.throwT = 0;
+      this.attackT = 0;
       this.slideT = 0;
-      this.inventory = { mousetrap: 0, puddle: 0, firecracker: 0, trapdoor: 0, banana: 0, pizza: 0, diamond: 0 };
+      this.inventory = { mousetrap: 0, firecracker: 0, trapdoor: 0, banana: 0, branch: 0, cone: 0, pizza: 0, diamond: 0 };
       this.selectedTrap = 0;
       // Power-up состояния
       this.starT = 0;           // звезда: бессмертие + 2x скорость
@@ -36,7 +37,6 @@
       // Стартовые припасы — чтобы прототип сразу был интерактивным.
       this.inventory.mousetrap = 2;
       this.inventory.firecracker = 1;
-      this.inventory.puddle = 1;
       this.inventory.trapdoor = 1;
       this.inventory.banana = 1;
       if (this.character === 'janitor') this.inventory.diamond = 1;
@@ -48,7 +48,7 @@
 
     itemTypes() {
       const bait = this.character === 'janitor' ? 'diamond' : 'pizza';
-      return C.TRAP_TYPES.concat([bait]);
+      return C.TRAP_TYPES.concat(C.COMBAT_TYPES, [bait]);
     }
 
     selectedType() {
@@ -57,6 +57,11 @@
     }
 
     addPickup(type) {
+      if (type === 'branch') {
+        if (this.inventory.branch > 0) return false;
+        this.inventory.branch = C.MELEE_HITS_PER_BRANCH;
+        return true;
+      }
       if (this.inventory[type] >= C.INVENTORY_MAX_PER_TYPE) return false;
       this.inventory[type] += 1;
       return true;
@@ -70,7 +75,7 @@
       this.hp = Math.max(0, this.hp - amount);
       this.invincibility = C.INVINCIBILITY_AFTER_HIT;
       this.sliding = null;
-      this.puddleT = 0;
+      this.coneT = 0;
       if (window.G && window.G.audio) {
         window.G.audio.play(this.character === 'raccoon' ? 'hurt_raccoon' : 'hurt_janitor');
       }
@@ -116,13 +121,13 @@
       this.fallen = C.TRAPDOOR_FALL_TIME;
       this.fallReturnAt = { x: this.x, y: this.y };
       this.sliding = null;
-      this.puddleT = 0;
+      this.coneT = 0;
     }
 
-    splashInPuddle() {
+    stunWithCone() {
       if (this.fallen > 0) return;
       this.sliding = null;
-      this.puddleT = C.PUDDLE_STUCK_TIME;
+      this.coneT = C.CONE_STUN_TIME;
       this.moving = false;
       this.walkT = 0;
     }
@@ -130,6 +135,7 @@
     update(dt, traps) {
       if (!this.alive) return;
       if (this.invincibility > 0) this.invincibility -= dt;
+      if (this.attackT > 0) this.attackT = Math.max(0, this.attackT - dt);
 
       // === Power-up таймеры ===
       if (this.starT > 0) {
@@ -138,13 +144,10 @@
       }
       if (this.hiddenT > 0) this.hiddenT = Math.max(0, this.hiddenT - dt);
 
-      if (this.puddleT > 0) {
-        this.puddleT = Math.max(0, this.puddleT - dt);
+      if (this.coneT > 0) {
+        if (this.coneT > 0) this.coneT = Math.max(0, this.coneT - dt);
         this.walkT += dt * 6;
         this.moving = false;
-        if (window.G && window.G.particles && Math.random() < 0.35) {
-          window.G.particles.burstSplash(this.x, this.y + 8);
-        }
         this.input.consume && this.input.consume();
         return;
       }
@@ -266,6 +269,9 @@
       if (this.input.wasPressed && this.input.wasPressed('place')) {
         traps.tryPlace(this);
       }
+      if (this.input.wasPressed && this.input.wasPressed('attack')) {
+        traps.tryMelee(this);
+      }
 
       triggerTrapsAt(this, traps);
     }
@@ -291,13 +297,14 @@
         hp: this.hp,
         invincibility: this.invincibility,
         sliding: this.sliding,
-        puddleT: this.puddleT,
+        coneT: this.coneT,
         fallen: this.fallen,
         alive: this.alive,
         walkT: this.walkT,
         moving: this.moving,
         idleT: this.idleT,
         throwT: this.throwT,
+        attackT: this.attackT,
         inventory: { ...this.inventory },
         selectedTrap: this.selectedTrap,
         starT: this.starT,
@@ -312,13 +319,14 @@
       this.hp = s.hp;
       this.invincibility = s.invincibility;
       this.sliding = s.sliding;
-      this.puddleT = s.puddleT || 0;
+      this.coneT = s.coneT || 0;
       this.fallen = s.fallen;
       this.alive = s.alive;
       this.walkT = s.walkT;
       this.moving = s.moving;
       this.idleT = s.idleT;
       this.throwT = s.throwT || 0;
+      this.attackT = s.attackT || 0;
       this.inventory = { ...s.inventory };
       this.selectedTrap = s.selectedTrap;
       this.starT = s.starT || 0;

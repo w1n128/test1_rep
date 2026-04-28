@@ -965,6 +965,39 @@
     return rowsToStrs(r);
   }
 
+  function makeBranch() {
+    const r = blank(48, 48);
+    for (let i = 0; i < 30; i++) {
+      const x = 9 + i;
+      const y = 35 - Math.floor(i * 0.72);
+      fillRect(r, x, y, 3, 3, 'w');
+      if (i % 3 === 0) setPx(r, x + 1, y - 1, 'h');
+    }
+    for (let i = 0; i < 10; i++) {
+      fillRect(r, 18 + i, 28 - i, 2, 2, 'w');
+      fillRect(r, 26 + i, 24 - Math.floor(i * 0.35), 2, 2, 'w');
+    }
+    fillEllipse(r, 14, 29, 4, 2, 'l');
+    fillEllipse(r, 32, 18, 4, 2, 'l');
+    fillEllipse(r, 37, 22, 3, 2, 'l');
+    return rowsToStrs(r);
+  }
+
+  function makeCone() {
+    const r = blank(48, 48);
+    fillRect(r, 12, 37, 24, 5, 'd');
+    fillRect(r, 15, 34, 18, 4, 'o');
+    for (let y = 10; y < 36; y++) {
+      const half = Math.floor((y - 8) * 0.42);
+      fillRect(r, 24 - half, y, half * 2 + 1, 1, 'o');
+    }
+    fillRect(r, 17, 26, 14, 4, 'w');
+    fillRect(r, 20, 16, 8, 3, 'w');
+    fillRect(r, 21, 8, 6, 4, 'h');
+    fillRect(r, 18, 34, 12, 2, 'h');
+    return rowsToStrs(r);
+  }
+
   function makeTrapdoor() {
     const r = blank(48, 48);
     const cx = 24, cy = 24;
@@ -1019,9 +1052,6 @@
     m: P.mousetrap, s: P.mtDark, c: P.mtDark,
     y: P.cheese, h: P.crateLine, M: P.mtSpring,
   };
-  const puddlePalette = {
-    u: P.puddle, v: P.puddleHi, d: P.puddleDark,
-  };
   const firecrackerPalette = {
     f: P.fireworkD, r: P.firework, y: P.fireworkY,
     Y: P.sparkY, S: P.sparkO, b: P.fuseBrown,
@@ -1032,21 +1062,29 @@
   const bananaPalette = {
     y: P.banana, d: P.bananaD, h: P.bananaH,
   };
+  const branchPalette = {
+    w: '#8a4d20', h: '#d7a15a', l: '#4ea64a',
+  };
+  const conePalette = {
+    o: '#ff7a18', d: '#9b3a08', w: '#fff1d0', h: '#ffb05a',
+  };
 
   const fallbackTrapSprites = {
     mousetrap:   makeBitmap(makeMousetrap(),   mousetrapPalette),
-    puddle:      makeBitmap(makePuddle(),      puddlePalette),
     firecracker: makeBitmap(makeFirecracker(), firecrackerPalette),
     trapdoor:    makeBitmap(makeTrapdoor(),    trapdoorPalette),
     banana:      makeBitmap(makeBanana(),      bananaPalette),
+    branch:      makeBitmap(makeBranch(),      branchPalette),
+    cone:        makeBitmap(makeCone(),        conePalette),
   };
 
   G.sprites.traps = {
     mousetrap:   loadPngSprite('./assets/traps/mousetrap.png',   fallbackTrapSprites.mousetrap),
-    puddle:      loadPngSprite('./assets/traps/puddle.png',      fallbackTrapSprites.puddle),
     firecracker: loadPngSprite('./assets/traps/firecracker.png', fallbackTrapSprites.firecracker),
     trapdoor:    loadPngSprite('./assets/traps/trapdoor.png',    fallbackTrapSprites.trapdoor),
     banana:      loadPngSprite('./assets/traps/banana.png',      fallbackTrapSprites.banana),
+    branch:      fallbackTrapSprites.branch,
+    cone:        fallbackTrapSprites.cone,
   };
 
   // --- Power-ups 48×48 ---

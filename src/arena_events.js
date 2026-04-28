@@ -69,7 +69,7 @@
         occupied.add(key);
       }
       for (const t of traps ? traps.list : []) {
-        if (t.destroyed || (t.type !== 'banana' && t.type !== 'puddle')) continue;
+        if (t.destroyed || t.type !== 'banana') continue;
         const nx = t.tileX + d.x;
         const ny = t.tileY + d.y;
         const key = nx + ',' + ny;

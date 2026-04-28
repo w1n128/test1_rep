@@ -15,7 +15,6 @@
       this.age = 0;
       // Тип-специфика
       if (type === 'firecracker') this.fuse = C.FIRECRACKER_FUSE;
-      if (type === 'puddle') this.life = C.PUDDLE_LIFETIME;
       if (type === 'banana') {
         this.life = C.BANANA_LIFETIME;
         this.armDelay = 0; // мгновенно активен — это «брошенная» кожура
@@ -34,7 +33,7 @@
           this.destroyed = true;
         }
       }
-      if (this.type === 'puddle' || this.type === 'banana') {
+      if (this.type === 'banana') {
         this.life -= dt;
         if (this.life <= 0) this.destroyed = true;
       }
@@ -126,6 +125,7 @@
     tryPlace(player) {
       const type = player.selectedType();
       if (player.inventory[type] <= 0) return false;
+      if (C.COMBAT_TYPES.indexOf(type) >= 0) return false;
       if (C.BAIT_TYPES.indexOf(type) >= 0) return this.useBait(player, type);
       if (this.countByOwner(player.id) >= C.TRAP_LIMIT_PER_PLAYER) return false;
 
@@ -168,6 +168,62 @@
         // Пока банан летит — задержим его активацию: вместо обычного armDelay
         // используем длительность полёта.
         trap.armDelay = C.BANANA_FLIGHT_TIME;
+      }
+      return true;
+    }
+
+    playerInFrontOf(player) {
+      if (!this.players) return null;
+      const d = dirVec(player.dir);
+      const tx = player.tileX + d.x;
+      const ty = player.tileY + d.y;
+      return this.players.find((p) => (
+        p.id !== player.id &&
+        p.alive &&
+        p.fallen <= 0 &&
+        p.tileX === tx &&
+        p.tileY === ty
+      )) || null;
+    }
+
+    tryMelee(player) {
+      const type = player.selectedType();
+      if (C.COMBAT_TYPES.indexOf(type) < 0) return false;
+      if (player.inventory[type] <= 0) return false;
+
+      const d = dirVec(player.dir);
+      const tx = player.tileX + d.x;
+      const ty = player.tileY + d.y;
+      const cx = tx * C.TILE + C.TILE / 2;
+      const cy = ty * C.TILE + C.TILE / 2;
+      const target = this.playerInFrontOf(player);
+      player.attackT = C.MELEE_EFFECT_TIME;
+
+      if (G.fx) {
+        G.fx.audio(type === 'cone' ? 'cone_swing' : 'melee_swing');
+        this.effects.push({ kind: type === 'cone' ? 'cone_swing' : 'melee_swing', x: cx, y: cy, dir: player.dir, t: 0, lifetime: C.MELEE_EFFECT_TIME });
+      }
+      if (!target) return false;
+
+      if (type === 'branch') {
+        if (target.damage(1)) {
+          player.inventory.branch = Math.max(0, player.inventory.branch - 1);
+          if (G.fx) {
+            G.fx.audio(target.character === 'raccoon' ? 'melee_hit_raccoon' : 'melee_hit_janitor');
+            G.fx.shake(4, 0.14);
+            G.fx.particles('burstStars', target.x, target.y - 14);
+            this.effects.push({ kind: 'bonk', x: target.x, y: target.y - 18, t: 0, lifetime: 0.55 });
+          }
+        }
+      } else if (type === 'cone') {
+        target.stunWithCone();
+        player.inventory.cone = Math.max(0, player.inventory.cone - 1);
+        if (G.fx) {
+          G.fx.audio('cone_hit');
+          G.fx.shake(3, 0.12);
+          G.fx.particles('burstStars', target.x, target.y - 16);
+          this.effects.push({ kind: 'cone_pop', x: target.x, y: target.y - 20, t: 0, lifetime: 0.55 });
+        }
       }
       return true;
     }
@@ -220,15 +276,6 @@
           fx.particles('burstStars', player.x, player.y - 14);
           fx.particles('burstStars', player.x - 8, player.y - 8);
           fx.particles('burstStars', player.x + 8, player.y - 8);
-        }
-      } else if (trap.type === 'puddle') {
-        if (player.puddleT <= 0) {
-          player.splashInPuddle();
-          trap.destroyed = true;
-          fx.audio('splash');
-          fx.audio('trap_puddle_hit');
-          fx.particles('burstSplash', cx, cy);
-          this.effects.push({ kind: 'wet', x: player.x, y: player.y - 14, t: 0, lifetime: 0.55 });
         }
       } else if (trap.type === 'banana') {
         if (!player.sliding) {

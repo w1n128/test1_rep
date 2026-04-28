@@ -57,7 +57,7 @@
       if (Math.random() < C.POWERUP_SPAWN_CHANCE) {
         type = this.randomPowerupType();
       } else {
-        type = C.TRAP_TYPES[Math.floor(Math.random() * C.TRAP_TYPES.length)];
+        type = C.PICKUP_TYPES[Math.floor(Math.random() * C.PICKUP_TYPES.length)];
       }
       for (let attempt = 0; attempt < 50; attempt++) {
         const x = 1 + Math.floor(Math.random() * (C.ARENA_W - 2));

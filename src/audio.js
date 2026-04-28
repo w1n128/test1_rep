@@ -182,10 +182,6 @@
         tone(1600, 0.035, 'square', 0.12);
         tone(700, 0.05, 'square', 0.08, 0.035, 520);
         break;
-      case 'pickup_puddle':
-        noise(0.10, 0.08, 1300);
-        tone(520, 0.07, 'sine', 0.06, 0.04, 760);
-        break;
       case 'pickup_firecracker':
         tone(880, 0.04, 'square', 0.11);
         noise(0.09, 0.06, 3200, 0.03);
@@ -198,6 +194,15 @@
       case 'pickup_banana':
         tone(740, 0.07, 'triangle', 0.10);
         tone(980, 0.06, 'triangle', 0.08, 0.05, 620);
+        break;
+      case 'pickup_branch':
+        tone(260, 0.05, 'triangle', 0.11);
+        tone(430, 0.05, 'triangle', 0.08, 0.04, 320);
+        noise(0.05, 0.05, 1200, 0.02);
+        break;
+      case 'pickup_cone':
+        tone(520, 0.05, 'square', 0.10);
+        tone(740, 0.06, 'square', 0.08, 0.05, 560);
         break;
       case 'place':
         tone(220, 0.08, 'square', 0.12);
@@ -215,6 +220,33 @@
         break;
       case 'damage':
         tone(220, 0.15, 'sawtooth', 0.18, 0, 110);
+        break;
+      case 'melee_swing':
+        if (!canPlay('melee_swing', 120)) return;
+        noise(0.10, 0.09, 2200);
+        tone(360, 0.08, 'sine', 0.05, 0, 620);
+        break;
+      case 'cone_swing':
+        if (!canPlay('cone_swing', 120)) return;
+        tone(520, 0.06, 'square', 0.08, 0, 720);
+        noise(0.08, 0.05, 1800);
+        break;
+      case 'cone_hit':
+        if (!canPlay('cone_hit', 180)) return;
+        tone(620, 0.08, 'square', 0.14);
+        tone(360, 0.10, 'square', 0.10, 0.06, 180);
+        noise(0.08, 0.08, 900, 0.04);
+        break;
+      case 'melee_hit_janitor':
+        if (!canPlay('melee_hit_janitor', 220)) return;
+        tone(150, 0.20, 'sawtooth', 0.24, 0, 80);
+        tone(230, 0.08, 'square', 0.12, 0.04, 130);
+        noise(0.05, 0.06, 700, 0.03);
+        break;
+      case 'melee_hit_raccoon':
+        if (!canPlay('melee_hit_raccoon', 220)) return;
+        tone(1350, 0.10, 'square', 0.18, 0, 1850);
+        tone(900, 0.08, 'sine', 0.10, 0.06, 520);
         break;
       // --- Реакция дворника на боль: грубое низкое «ой!» ---
       case 'hurt_janitor':
@@ -242,12 +274,6 @@
         if (!canPlay('trap_mousetrap_hit', 160)) return;
         tone(3600, 0.035, 'square', 0.18, 0, 1200);
         tone(260, 0.12, 'triangle', 0.16, 0.02, 120);
-        break;
-      case 'trap_puddle_hit':
-        if (!canPlay('trap_puddle_hit', 180)) return;
-        noise(0.20, 0.18, 1400);
-        tone(520, 0.08, 'sine', 0.08, 0.04, 260);
-        tone(340, 0.10, 'sine', 0.06, 0.12, 180);
         break;
       case 'trap_banana_hit':
         if (!canPlay('trap_banana_hit', 180)) return;

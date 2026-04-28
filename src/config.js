@@ -28,14 +28,19 @@
     PICKUP_LIMIT_ON_MAP: 6,
     INVENTORY_MAX_PER_TYPE: 3,
 
-    TRAP_TYPES: ['mousetrap', 'puddle', 'firecracker', 'trapdoor', 'banana'],
-    get ITEM_TYPES() { return this.TRAP_TYPES.concat(this.BAIT_TYPES); },
+    TRAP_TYPES: ['mousetrap', 'firecracker', 'trapdoor', 'banana'],
+    COMBAT_TYPES: ['branch', 'cone'],
+    get PICKUP_TYPES() { return this.TRAP_TYPES.concat(this.COMBAT_TYPES); },
+    get ITEM_TYPES() { return this.TRAP_TYPES.concat(this.COMBAT_TYPES, this.BAIT_TYPES); },
     POWERUP_TYPES: ['star', 'broom', 'boombox'],
     POWERUP_WEIGHTS: { star: 1, broom: 2, boombox: 2 },
     BAIT_TYPES: ['pizza', 'diamond'],
     POWERUP_SPAWN_CHANCE: 0.125,   // star как раньше, broom/boombox в 2 раза чаще
     BAIT_PULL_DURATION: 2.8,
     BAIT_PULL_STRENGTH: 2.4,
+    MELEE_HITS_PER_BRANCH: 3,
+    CONE_STUN_TIME: 1.5,
+    MELEE_EFFECT_TIME: 0.22,
     NIGHT_DAY_DURATION: 120.0,      // сколько длится день перед ночью
     NIGHT_DURATION: 60.0,           // длительность ночи
     FLASHLIGHT_TILES: 3,            // дальность фонарика в тайлах
@@ -51,8 +56,6 @@
     TRAP_ARM_DELAY: 0.4,
     FIRECRACKER_FUSE: 0.735,
     FIRECRACKER_RADIUS_TILES: 3.0,
-    PUDDLE_LIFETIME: 8.0,
-    PUDDLE_STUCK_TIME: 2.0,
     TRAPDOOR_FALL_TIME: 2.0,
     BANANA_THROW_TILES: 3,
     BANANA_LIFETIME: 6.0,
@@ -132,10 +135,6 @@
     mtSpring:  '#f4f4f4',
     mtSprDark: '#7a7a7a',
     cheese:    '#ffd84a',
-    // Лужа
-    puddle:    '#35a9ff',
-    puddleHi:  '#d8f7ff',
-    puddleDark:'#166db0',
     // Петарда / динамит
     firework:  '#f04444',
     fireworkD: '#811515',

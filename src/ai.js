@@ -97,6 +97,12 @@
       return have[Math.floor(Math.random() * have.length)];
     }
 
+    pickCombatItem() {
+      if (this.player.inventory.branch > 0) return 'branch';
+      if (this.player.inventory.cone > 0) return 'cone';
+      return null;
+    }
+
     decide() {
       const px = this.player.tileX, py = this.player.tileY;
 
@@ -171,6 +177,28 @@
       this.switchCD = Math.max(0, this.switchCD - dt);
       this.placeCD = Math.max(0, this.placeCD - dt);
       this.baitCD = Math.max(0, this.baitCD - dt);
+
+      if (this.opponent && this.opponent.alive) {
+        const dx = this.opponent.tileX - this.player.tileX;
+        const dy = this.opponent.tileY - this.player.tileY;
+        if (Math.abs(dx) + Math.abs(dy) === 1) {
+          if (Math.abs(dx) > Math.abs(dy)) this._actions[dx > 0 ? 'right' : 'left'] = true;
+          else this._actions[dy > 0 ? 'down' : 'up'] = true;
+          const combat = this.pickCombatItem();
+          if (combat && this.placeCD <= 0) {
+            if (this.player.selectedType() !== combat) {
+              if (this.switchCD === 0) {
+                this._justPressed.switchNext = true;
+                this.switchCD = 0.18;
+              }
+            } else {
+              this._justPressed.attack = true;
+              this.placeCD = 0.45;
+            }
+            return;
+          }
+        }
+      }
 
       if (this.repathT <= 0 || (this.path.length === 0 && !this.placeIntent)) {
         this.decide();
