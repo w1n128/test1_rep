@@ -289,14 +289,21 @@
       setPx(r, 23, 12, 'S');
     }
 
-    // Глаза + рот (только не сзади)
+    // Глаза + рот + борода (только не сзади)
     if (dir === 'down') {
       fillRect(r, 11, 11, 2, 2, 'M');
       fillRect(r, 19, 11, 2, 2, 'M');
+      // Борода: усы + щетина по подбородку
+      fillRect(r, 13, 13, 6, 1, 'B');
+      fillRect(r, 12, 14, 8, 1, 'B');
+      // Рот — узкая светлая щель в бороде
       fillRect(r, 14, 13, 4, 1, 'S');
     } else if (dir === 'left') {
       fillRect(r, 10, 11, 2, 2, 'M');
       fillRect(r, 17, 11, 2, 2, 'M');
+      // Борода вид сбоку
+      fillRect(r, 11, 13, 7, 1, 'B');
+      fillRect(r, 10, 14, 8, 1, 'B');
       fillRect(r, 12, 13, 3, 1, 'S');
     }
 
@@ -403,6 +410,7 @@
   const janitorPalette = {
     E: P.capDark, e: P.cap,
     s: P.skin, S: P.skinDark, M: P.boot,
+    B: P.beard,
     J: P.jacketDark, j: P.jacket,
     v: P.vest, V: P.vestStripe,
     p: P.pants, P: P.pantsDark,
@@ -450,18 +458,20 @@
     fillRect(r, 26, 6, 1, 3, 'r');
 
     if (dir !== 'up') {
-      // Маска (две тёмные области вокруг глаз)
-      fillRect(r, 8, 6, 7, 4, 'm');
-      fillRect(r, 17, 6, 7, 4, 'm');
-      // Белые «брови» / морда
+      // Маска (две тёмные области вокруг глаз) — пошире и поглубже
+      fillRect(r, 7, 6, 8, 5, 'm');
+      fillRect(r, 17, 6, 8, 5, 'm');
+      // Белые «брови» над маской
       fillRect(r, 8, 5, 7, 1, 'w');
       fillRect(r, 17, 5, 7, 1, 'w');
-      // Глаза (белые точки в маске)
-      fillRect(r, 10, 7, 2, 2, 'w');
-      fillRect(r, 19, 7, 2, 2, 'w');
+      // Глаза (крупные белые внутри маски)
+      fillRect(r, 9, 7, 3, 2, 'w');
+      fillRect(r, 19, 7, 3, 2, 'w');
       // Зрачки
       setPx(r, 11, 7, 'm');
+      setPx(r, 11, 8, 'm');
       setPx(r, 20, 7, 'm');
+      setPx(r, 20, 8, 'm');
       // Морда (белая часть от носа)
       fillRect(r, 13, 9, 6, 3, 'w');
       // Нос
@@ -500,19 +510,28 @@
       fillRect(r, 9, 20, 14, 1, 'm');
     }
 
-    // Хвост (виден сбоку или сзади)
+    // Пушистый полосатый хвост (виден всегда)
     if (dir === 'left') {
-      fillRect(r, 0, 16, 6, 6, 'r');
-      fillRect(r, 1, 17, 4, 1, 'm');
-      fillRect(r, 1, 20, 4, 1, 'm');
-      // Кончик хвоста чёрный
-      fillRect(r, 0, 18, 1, 2, 'm');
-    } else if (dir === 'down' || dir === 'up') {
-      // Хвост выглядывает справа сзади
-      fillRect(r, 26, 18, 6, 6, 'r');
-      fillRect(r, 27, 19, 4, 1, 'm');
-      fillRect(r, 27, 22, 4, 1, 'm');
-      fillRect(r, 31, 20, 1, 2, 'm');
+      // Хвост слева — большой и пушистый
+      fillRect(r, 0, 15, 7, 9, 'r');
+      // Полоски (чередование тёмных колец)
+      fillRect(r, 1, 16, 5, 1, 'm');
+      fillRect(r, 1, 19, 5, 1, 'm');
+      fillRect(r, 1, 22, 5, 1, 'm');
+      // Светлые подложки между полосами
+      fillRect(r, 1, 18, 5, 1, 'R');
+      fillRect(r, 1, 21, 5, 1, 'R');
+      // Чёрный кончик
+      fillRect(r, 0, 17, 1, 6, 'm');
+    } else {
+      // Хвост справа сзади — для down/up/right
+      fillRect(r, 25, 15, 7, 9, 'r');
+      fillRect(r, 26, 16, 5, 1, 'm');
+      fillRect(r, 26, 19, 5, 1, 'm');
+      fillRect(r, 26, 22, 5, 1, 'm');
+      fillRect(r, 26, 18, 5, 1, 'R');
+      fillRect(r, 26, 21, 5, 1, 'R');
+      fillRect(r, 31, 17, 1, 6, 'm');
     }
 
     // Лапы (frame-зависимо или поза)
@@ -661,35 +680,41 @@
 
   function makeBanana() {
     const r = blank(32, 32);
-    // Y-образная очищенная кожура: центр + три «лепестка»
-    // Центральная мякоть
-    fillRect(r, 13, 14, 6, 5, 'h');
-    // Лепесток вверх-влево
-    fillRect(r, 9, 8, 5, 8, 'y');
-    fillRect(r, 8, 9, 1, 6, 'd');
-    fillRect(r, 13, 9, 1, 5, 'd');
-    setPx(r, 9, 7, 'd');
-    setPx(r, 13, 7, 'd');
-    // Лепесток вверх-вправо
-    fillRect(r, 18, 8, 5, 8, 'y');
-    fillRect(r, 23, 9, 1, 6, 'd');
-    fillRect(r, 18, 9, 1, 5, 'd');
-    setPx(r, 18, 7, 'd');
-    setPx(r, 22, 7, 'd');
-    // Лепесток вниз
-    fillRect(r, 12, 19, 8, 8, 'y');
-    fillRect(r, 11, 20, 1, 6, 'd');
-    fillRect(r, 20, 20, 1, 6, 'd');
-    fillRect(r, 14, 26, 4, 1, 'd');
-    // Кончики (потемнее)
-    setPx(r, 11, 8, 'd'); setPx(r, 11, 9, 'd');
-    setPx(r, 20, 8, 'd'); setPx(r, 21, 8, 'd');
-    setPx(r, 15, 27, 'd'); setPx(r, 16, 27, 'd');
-    // Блики
-    setPx(r, 11, 11, 'h');
-    setPx(r, 20, 11, 'h');
-    setPx(r, 14, 22, 'h');
-    setPx(r, 17, 22, 'h');
+    // Очищенная кожура (вид сверху) — три развёрнутых лепестка вокруг светлой мякоти,
+    // стебелёк направлен вверх.
+    // Стебелёк
+    fillRect(r, 15, 4, 2, 4, 'd');
+    setPx(r, 14, 5, 'd');
+    setPx(r, 17, 5, 'd');
+    // Верхний лепесток (короткий, идёт от стебелька вниз к центру)
+    fillRect(r, 12, 8, 8, 6, 'y');
+    fillRect(r, 11, 9, 1, 4, 'd');
+    fillRect(r, 20, 9, 1, 4, 'd');
+    fillRect(r, 12, 8, 8, 1, 'd');
+    // Левый лепесток (опущен вниз-влево)
+    fillRect(r, 5, 14, 8, 8, 'y');
+    fillRect(r, 4, 15, 1, 6, 'd');
+    fillRect(r, 5, 14, 8, 1, 'd');
+    fillRect(r, 5, 22, 8, 1, 'd');
+    // Правый лепесток (опущен вниз-вправо)
+    fillRect(r, 19, 14, 8, 8, 'y');
+    fillRect(r, 27, 15, 1, 6, 'd');
+    fillRect(r, 19, 14, 8, 1, 'd');
+    fillRect(r, 19, 22, 8, 1, 'd');
+    // Нижний лепесток (длинный)
+    fillRect(r, 12, 18, 8, 9, 'y');
+    fillRect(r, 11, 19, 1, 7, 'd');
+    fillRect(r, 20, 19, 1, 7, 'd');
+    fillRect(r, 12, 27, 8, 1, 'd');
+    // Светлая мякоть в центре (соединяет лепестки)
+    fillRect(r, 13, 13, 6, 6, 'h');
+    fillRect(r, 14, 12, 4, 1, 'h');
+    fillRect(r, 14, 19, 4, 1, 'h');
+    // Блики на жёлтых поверхностях
+    setPx(r, 14, 10, 'h');
+    setPx(r, 7, 16, 'h');
+    setPx(r, 24, 16, 'h');
+    setPx(r, 15, 22, 'h');
     return rowsToStrs(r);
   }
 
@@ -697,6 +722,7 @@
     const r = blank(32, 32);
     const cx = 16, cy = 16;
     const R = 14;
+    // Тёмная заливка диска
     for (let y = 0; y < 32; y++) {
       for (let x = 0; x < 32; x++) {
         const dx = x - cx, dy = y - cy;
@@ -705,27 +731,27 @@
         else if (d < R) setPx(r, x, y, 't');
       }
     }
-    // Радиальный узор: шесть «спиц» от центра наружу
-    for (let a = 0; a < 6; a++) {
-      const ang = (a * Math.PI) / 3;
-      for (let s = 3; s < R - 3; s++) {
-        const x = Math.round(cx + Math.cos(ang) * s);
-        const y = Math.round(cy + Math.sin(ang) * s);
-        setPx(r, x, y, 't');
+    // Сетка ямок-точек (чугунный люк)
+    for (let yy = -10; yy <= 10; yy += 3) {
+      for (let xx = -10; xx <= 10; xx += 3) {
+        const x = cx + xx, y = cy + yy;
+        if (Math.sqrt(xx * xx + yy * yy) < R - 3) {
+          setPx(r, x, y, 't');
+        }
       }
     }
-    // Концентрический узор (точки)
-    for (let a = 0; a < 12; a++) {
-      const ang = (a * Math.PI) / 6;
-      const x = Math.round(cx + Math.cos(ang) * 8);
-      const y = Math.round(cy + Math.sin(ang) * 8);
-      setPx(r, x, y, 't');
+    // Внешнее тёмное кольцо для рамки
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 32; x++) {
+        const dx = x - cx, dy = y - cy;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d > R - 2 && d < R - 1) setPx(r, x, y, 't');
+      }
     }
-    // Центральный кружок
-    fillRect(r, cx - 1, cy - 1, 2, 2, 't');
-    // Лёгкий блик
-    setPx(r, cx - 4, cy - 6, 'n');
-    setPx(r, cx - 3, cy - 6, 'n');
+    // Лёгкий блик сверху-слева на ободе
+    setPx(r, cx - 5, cy - 11, 'n');
+    setPx(r, cx - 4, cy - 12, 'n');
+    setPx(r, cx - 3, cy - 12, 'n');
     return rowsToStrs(r);
   }
 
