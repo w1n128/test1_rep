@@ -168,7 +168,89 @@
         ctx.scale(flip, 1);
         ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
         ctx.restore();
+      } else if (eff.kind === 'bonk') {
+        if (!isLitPx(litTiles, eff.x, eff.y)) continue;
+        const k = eff.t / eff.lifetime;
+        ctx.save();
+        ctx.globalAlpha = 1 - k;
+        ctx.fillStyle = '#ffe860';
+        for (let i = 0; i < 3; i++) {
+          const a = k * 4 + i * Math.PI * 2 / 3;
+          const x = eff.x + Math.cos(a) * (8 + k * 10);
+          const y = eff.y + Math.sin(a) * (5 + k * 7);
+          ctx.fillRect(Math.round(x - 2), Math.round(y - 2), 4, 4);
+        }
+        ctx.restore();
+      } else if (eff.kind === 'wet') {
+        if (!isLitPx(litTiles, eff.x, eff.y)) continue;
+        const k = eff.t / eff.lifetime;
+        ctx.save();
+        ctx.globalAlpha = 1 - k;
+        ctx.fillStyle = '#9addff';
+        for (let i = 0; i < 5; i++) {
+          ctx.fillRect(Math.round(eff.x - 10 + i * 5), Math.round(eff.y + k * 18 - (i % 2) * 4), 2, 5);
+        }
+        ctx.restore();
+      } else if (eff.kind === 'spin') {
+        if (!isLitPx(litTiles, eff.x, eff.y)) continue;
+        const k = eff.t / eff.lifetime;
+        ctx.save();
+        ctx.globalAlpha = 1 - k;
+        ctx.strokeStyle = '#fff060';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(eff.x, eff.y, 10 + k * 8, k * 8, k * 8 + Math.PI * 1.4);
+        ctx.stroke();
+        ctx.restore();
+      } else if (eff.kind === 'fall_puff') {
+        if (!isLitPx(litTiles, eff.x, eff.y)) continue;
+        const k = eff.t / eff.lifetime;
+        ctx.save();
+        ctx.globalAlpha = 0.7 * (1 - k);
+        ctx.fillStyle = '#d4c8a0';
+        ctx.beginPath();
+        ctx.ellipse(eff.x, eff.y + 8, 20 + k * 18, 7 + k * 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      } else if (eff.kind === 'scorch') {
+        if (!isLitPx(litTiles, eff.x, eff.y)) continue;
+        const k = eff.t / eff.lifetime;
+        ctx.save();
+        ctx.globalAlpha = 1 - k;
+        ctx.fillStyle = '#222';
+        ctx.fillRect(Math.round(eff.x - 8), Math.round(eff.y + k * 6), 16, 8);
+        ctx.fillStyle = '#ff8822';
+        ctx.fillRect(Math.round(eff.x - 5), Math.round(eff.y - 5 - k * 8), 3, 6);
+        ctx.fillRect(Math.round(eff.x + 3), Math.round(eff.y - 8 - k * 8), 3, 6);
+        ctx.restore();
       }
+    }
+  }
+
+  function drawPulls(ctx, pulls, litTiles) {
+    if (!pulls) return;
+    for (const p of pulls) {
+      if (!isLitPx(litTiles, p.x, p.y)) continue;
+      const k = p.t / p.lifetime;
+      const pulse = 0.5 + 0.5 * Math.sin(p.t * 18);
+      ctx.save();
+      ctx.globalAlpha = 0.5 * (1 - k * 0.35);
+      ctx.strokeStyle = p.type === 'pizza' ? '#ffd86a' : '#45d8ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 16 + pulse * 8, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = p.type === 'pizza' ? '#ffd86a' : '#d8fbff';
+      for (let i = 0; i < 6; i++) {
+        const a = p.t * 5 + i * Math.PI / 3;
+        ctx.fillRect(
+          Math.round(p.x + Math.cos(a) * (22 + pulse * 6) - 2),
+          Math.round(p.y + Math.sin(a) * (22 + pulse * 6) - 2),
+          4,
+          4
+        );
+      }
+      ctx.restore();
     }
   }
 
@@ -303,6 +385,7 @@
     drawPickups(ctx, pickups, time, litTiles);
     drawTraps(ctx, traps, viewer.id, time, litTiles);
     drawEffects(ctx, traps.effects, litTiles);
+    drawPulls(ctx, traps.pulls, litTiles);
     if (G.particles) G.particles.draw(ctx, litTiles ? ((px, py) => isLitPx(litTiles, px, py)) : null);
     for (const p of players) drawPlayer(ctx, p, viewer, time, litTiles);
     if (night.active) {
@@ -328,7 +411,23 @@
     ctx.fillText(label, tx, y + 81);
   }
 
-  function drawSplitScreen(ctx, players, traps, pickups, time, matchTime = 0) {
+  function drawEventHud(ctx, arenaEvents, x, y, w) {
+    if (!arenaEvents || !arenaEvents.label) return;
+    const label = arenaEvents.label();
+    if (!label) return;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.font = 'bold 13px monospace';
+    const tx = x + w / 2;
+    ctx.fillStyle = 'rgba(20,20,20,0.78)';
+    ctx.fillRect(tx - 70, y + 100, 140, 20);
+    ctx.strokeStyle = 'rgba(255,240,96,0.55)';
+    ctx.strokeRect(tx - 70.5, y + 100.5, 139, 19);
+    ctx.fillStyle = '#fff060';
+    ctx.fillText(label, tx, y + 103);
+  }
+
+  function drawSplitScreen(ctx, players, traps, pickups, time, matchTime = 0, arenaEvents = null) {
     const C_ = C;
     const night = nightState(matchTime);
     const vw = C_.VIEWPORT_W;
@@ -355,9 +454,11 @@
     G.hud.drawHUD(ctx, players[1], players, traps, pickups, 0, vh + gap, vw, vh);
     drawNightHud(ctx, night, 0, 0, vw);
     drawNightHud(ctx, night, 0, vh + gap, vw);
+    drawEventHud(ctx, arenaEvents, 0, 0, vw);
+    drawEventHud(ctx, arenaEvents, 0, vh + gap, vw);
   }
 
-  function drawSingleScreen(ctx, viewer, players, traps, pickups, time, matchTime = 0) {
+  function drawSingleScreen(ctx, viewer, players, traps, pickups, time, matchTime = 0, arenaEvents = null) {
     const C_ = C;
     const night = nightState(matchTime);
     const [sx, sy] = shakeOffset();
@@ -373,6 +474,7 @@
     // HUD на полную ширину
     G.hud.drawHUD(ctx, viewer, players, traps, pickups, 0, 0, C_.CANVAS_W, C_.CANVAS_H);
     drawNightHud(ctx, night, 0, 0, C_.CANVAS_W);
+    drawEventHud(ctx, arenaEvents, 0, 0, C_.CANVAS_W);
   }
 
   G.render = { init, drawSplitScreen, drawSingleScreen, shake, updateShake };

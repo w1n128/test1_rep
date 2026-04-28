@@ -120,6 +120,12 @@
       if (this.opponent.alive) {
         const ox = this.opponent.tileX, oy = this.opponent.tileY;
         const dOp = Math.abs(ox - px) + Math.abs(oy - py);
+        const bait = this.player.character === 'raccoon' ? 'pizza' : 'diamond';
+        if (this.player.inventory[bait] > 0 && dOp >= 7 && Math.random() < 0.28) {
+          this.placeIntent = { type: bait, atTile: [px, py] };
+          this.path = [];
+          return;
+        }
         if (dOp <= C.AI_THREAT_RADIUS_TILES) {
           const type = this.pickAvailableTrap();
           if (type && Math.random() < C.AI_PLACE_TRAP_CHANCE) {

@@ -29,8 +29,12 @@
     INVENTORY_MAX_PER_TYPE: 3,
 
     TRAP_TYPES: ['mousetrap', 'puddle', 'firecracker', 'trapdoor', 'banana'],
+    get ITEM_TYPES() { return this.TRAP_TYPES.concat(this.BAIT_TYPES); },
     POWERUP_TYPES: ['star', 'broom', 'boombox'],
+    BAIT_TYPES: ['pizza', 'diamond'],
     POWERUP_SPAWN_CHANCE: 0.075,   // шанс power-up вместо ловушки (в 4 раза реже)
+    BAIT_PULL_DURATION: 2.8,
+    BAIT_PULL_STRENGTH: 2.4,
     NIGHT_DAY_DURATION: 120.0,      // сколько длится день перед ночью
     NIGHT_DURATION: 60.0,           // длительность ночи
     FLASHLIGHT_TILES: 3,            // дальность фонарика в тайлах
@@ -44,7 +48,7 @@
     BOOMBOX_HEAL_INTERVAL: 2.0,    // каждые сколько секунд +1 HP
     BOOMBOX_HEAL_AMOUNT: 1,
     TRAP_ARM_DELAY: 0.4,
-    FIRECRACKER_FUSE: 1.05,
+    FIRECRACKER_FUSE: 0.735,
     FIRECRACKER_RADIUS_TILES: 3.0,
     PUDDLE_LIFETIME: 8.0,
     TRAPDOOR_FALL_TIME: 2.0,
@@ -62,6 +66,9 @@
     AI_THREAT_RADIUS_TILES: 5,
     AI_MISTAKE_CHANCE: 0.20,
     AI_REPATH_INTERVAL: 0.5,
+    ARENA_EVENT_MIN: 32.0,
+    ARENA_EVENT_MAX: 44.0,
+    ARENA_EVENT_DURATION: 6.0,
   };
 
   G.PALETTE = {

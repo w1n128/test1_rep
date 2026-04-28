@@ -45,6 +45,7 @@
     constructor() {
       this.list = [];
       this.effects = [];
+      this.pulls = [];
       this.players = null;
     }
     setPlayers(players) { this.players = players; }
@@ -91,9 +92,41 @@
       return null;
     }
 
+    pullFor(playerId) {
+      for (const p of this.pulls) {
+        if (p.targetId === playerId && p.t < p.lifetime) return p;
+      }
+      return null;
+    }
+
+    useBait(player, type) {
+      if (C.BAIT_TYPES.indexOf(type) < 0) return false;
+      if (player.inventory[type] <= 0) return false;
+      if (!this.players) return false;
+      const target = this.players.find((p) => p.id !== player.id && p.alive);
+      if (!target) return false;
+      player.inventory[type] -= 1;
+      this.pulls = this.pulls.filter((p) => p.targetId !== target.id);
+      this.pulls.push({
+        type,
+        sourceId: player.id,
+        targetId: target.id,
+        x: player.x,
+        y: player.y,
+        t: 0,
+        lifetime: C.BAIT_PULL_DURATION,
+      });
+      if (G.fx) {
+        G.fx.audio(type === 'pizza' ? 'bait_pizza' : 'bait_diamond');
+        G.fx.particles('burstStars', player.x, player.y - 8);
+      }
+      return true;
+    }
+
     tryPlace(player) {
       const type = player.selectedType();
       if (player.inventory[type] <= 0) return false;
+      if (C.BAIT_TYPES.indexOf(type) >= 0) return this.useBait(player, type);
       if (this.countByOwner(player.id) >= C.TRAP_LIMIT_PER_PLAYER) return false;
 
       let tx = player.tileX, ty = player.tileY;
@@ -142,6 +175,8 @@
     update(dt) {
       for (const t of this.list) t.update(dt, this);
       this.list = this.list.filter((t) => !t.destroyed);
+      for (const p of this.pulls) p.t += dt;
+      this.pulls = this.pulls.filter((p) => p.t < p.lifetime);
       for (const eff of this.effects) eff.t += dt;
       this.effects = this.effects.filter((eff) => eff.t < eff.lifetime);
     }
@@ -178,7 +213,9 @@
           trap.destroyed = true;
           this.effects.push({ kind: 'snap', x: cx, y: cy, t: 0, lifetime: 0.25 });
           fx.audio('mousetrap_snap');
+          fx.audio('trap_mousetrap_hit');
           fx.shake(5, 0.18);
+          this.effects.push({ kind: 'bonk', x: player.x, y: player.y - 18, t: 0, lifetime: 0.55 });
           // Звёздочки от удара — спавним прямо около персонажа
           fx.particles('burstStars', player.x, player.y - 14);
           fx.particles('burstStars', player.x - 8, player.y - 8);
@@ -191,7 +228,9 @@
             player.sliding = { dx: d.x, dy: d.y };
             player.slideT = C.SLIDE_MIN_TIME;
             fx.audio('splash');
+            fx.audio('trap_puddle_hit');
             fx.particles('burstSplash', cx, cy);
+            this.effects.push({ kind: 'wet', x: player.x, y: player.y - 14, t: 0, lifetime: 0.55 });
           }
         }
       } else if (trap.type === 'banana') {
@@ -204,7 +243,9 @@
             player.slideT = C.SLIDE_MIN_TIME;
             trap.destroyed = true;
             fx.audio('slip');
+            fx.audio('trap_banana_hit');
             fx.particles('burstStars', cx, cy - 8);
+            this.effects.push({ kind: 'spin', x: player.x, y: player.y - 18, t: 0, lifetime: 0.6 });
           }
         }
       } else if (trap.type === 'trapdoor') {
@@ -213,8 +254,10 @@
         player.fallIntoTrapdoor();
         trap.destroyed = true;
         fx.audio('fall');
+        fx.audio('trap_trapdoor_hit');
         fx.shake(5, 0.2);
         fx.particles('burstStars', cx, cy - 8);
+        this.effects.push({ kind: 'fall_puff', x: cx, y: cy, t: 0, lifetime: 0.55 });
       }
       // Firecracker не триггерится наступанием — взрывается по таймеру.
     }
@@ -232,6 +275,7 @@
           fuse: t.fuse,
           life: t.life,
         })),
+        pulls: this.pulls.map(p => ({ ...p })),
       };
     }
     applySnapshot(s) {
@@ -243,6 +287,7 @@
         if (td.life !== undefined) t.life = td.life;
         return t;
       });
+      this.pulls = (s.pulls || []).map(p => ({ ...p }));
     }
 
     detonateFirecracker(trap) {
@@ -265,7 +310,10 @@
         const dx = ptx - cx;
         const dy = pty - cy;
         if (Math.sqrt(dx * dx + dy * dy) <= r) {
-          p.damage(1);
+          if (p.damage(1)) {
+            G.fx.audio('trap_firecracker_hit');
+            this.effects.push({ kind: 'scorch', x: p.x, y: p.y - 18, t: 0, lifetime: 0.7 });
+          }
         }
       }
     }

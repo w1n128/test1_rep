@@ -100,14 +100,14 @@
       ctx.drawImage(sprite, viewportX + 8 + i * 14, heartsY);
     }
 
-    // Инвентарь — 5 слотов справа: иконка + «x3»
-    const slotW = 42, slotH = 24;
+    // Инвентарь: ловушки + одноразовые приманки.
+    const slotW = 38, slotH = 24;
     const slotGap = 2;
     const iconSize = 20;
     const right = viewportX + viewportW - 8;
     const invY = viewportY + 4;
 
-    const types = C.TRAP_TYPES;
+    const types = C.ITEM_TYPES;
     for (let i = 0; i < types.length; i++) {
       const x = right - (types.length - i) * (slotW + slotGap);
       const isActive = player.selectedTrap === i;

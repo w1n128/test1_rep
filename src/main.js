@@ -79,6 +79,7 @@
   let players = [];
   let trapManager = null;
   let pickupManager = null;
+  let arenaEventManager = null;
   let ai = null;
   let winnerId = null;
   let time = 0;
@@ -98,6 +99,7 @@
     netInputDevice = null;
     trapManager = new G.TrapManager();
     pickupManager = new G.PickupManager();
+    arenaEventManager = new G.ArenaEventManager();
 
     let p1Input, p2Input;
     if (mode === 'net') {
@@ -137,6 +139,8 @@
     trapManager.setPlayers(players);
     pickupManager.setRefs(players, trapManager);
     G.trapManager = trapManager;
+    G.pickupManager = pickupManager;
+    G.arenaEvents = arenaEventManager;
 
     if (ai) ai.bind(p2, p1, trapManager, pickupManager);
 
@@ -159,10 +163,13 @@
     players = [];
     trapManager = null;
     pickupManager = null;
+    arenaEventManager = null;
     ai = null;
     netRole = null;
     netInputDevice = null;
     G.trapManager = null;
+    G.pickupManager = null;
+    G.arenaEvents = null;
     if (G.particles) G.particles.clear();
     if (G.audio && G.audio.music) G.audio.music.stop();
     if (G.net && G.net.disconnect) G.net.disconnect();
@@ -188,6 +195,7 @@
       }
       if (msg.tr && trapManager) trapManager.applySnapshot(msg.tr);
       if (msg.pk && pickupManager) pickupManager.applySnapshot(msg.pk);
+      if (msg.ae && arenaEventManager) arenaEventManager.applySnapshot(msg.ae);
       if (msg.ev && G.net && G.net.applyEvents) G.net.applyEvents(msg.ev);
       if (typeof msg.time === 'number') time = msg.time;
       if (typeof msg.matchTime === 'number') matchTime = msg.matchTime;
@@ -438,6 +446,7 @@
 
       trapManager.update(dt);
       pickupManager.update(dt);
+      if (arenaEventManager) arenaEventManager.update(dt, players, trapManager, pickupManager);
       if (G.particles) G.particles.update(dt);
       if (G.render && G.render.updateShake) G.render.updateShake(dt);
       syncReactiveMusic();
@@ -451,6 +460,7 @@
           p: players.map(p => p.serialize()),
           tr: trapManager.serialize(),
           pk: pickupManager.serialize(),
+          ae: arenaEventManager ? arenaEventManager.serialize() : null,
           ev: G.net.flushEvents(),
         });
       }
@@ -513,9 +523,9 @@
       // PLAYING / PAUSED / GAMEOVER
       if (mode === 'net') {
         const me = localNetPlayer();
-        if (me) G.render.drawSingleScreen(ctx, me, players, trapManager, pickupManager, time, matchTime);
+        if (me) G.render.drawSingleScreen(ctx, me, players, trapManager, pickupManager, time, matchTime, arenaEventManager);
       } else {
-        G.render.drawSplitScreen(ctx, players, trapManager, pickupManager, time, matchTime);
+        G.render.drawSplitScreen(ctx, players, trapManager, pickupManager, time, matchTime, arenaEventManager);
       }
       if (state === STATE.PAUSED)   drawPaused();
       if (state === STATE.GAMEOVER) drawGameOver();
@@ -800,7 +810,7 @@
       {
         type: 'firecracker',
         name: 'Петарда',
-        desc: 'Фитиль 1.05 сек, взрыв в радиусе 3 тайла, урон 1. До 3 в инвентаре.',
+        desc: 'Фитиль 0.735 сек, взрыв в радиусе 3 тайла, урон 1. До 3 в инвентаре.',
       },
       {
         type: 'trapdoor',
@@ -850,6 +860,8 @@
     ctx.fillText('Получил 5 ударов — проиграл. Активных ловушек одновременно: до 10.', cx, baseY + 40);
     ctx.fillStyle = '#a0e0ff';
     ctx.fillText('После 120 сек наступает ночь на 60 сек: динамика видна только в луче фонарика.', cx, baseY + 62);
+    ctx.fillStyle = '#ffe060';
+    ctx.fillText('Алмаз дворника и пицца енота притягивают соперника через всю карту.', cx, baseY + 84);
   }
 
   function drawOverlay(title, sub) {

@@ -1214,6 +1214,62 @@
     return rowsToStrs(r);
   }
 
+  function makePizza() {
+    const r = blank(48, 48);
+    // Треугольный кусок пиццы: сырная середина, корочка и пепперони.
+    for (let y = 8; y < 40; y++) {
+      const half = Math.floor((y - 8) * 0.45);
+      fillRect(r, 24 - half, y, half * 2 + 1, 1, 'c');
+    }
+    for (let y = 8; y < 40; y++) {
+      const half = Math.floor((y - 8) * 0.45);
+      setPx(r, 24 - half, y, 'o');
+      setPx(r, 24 + half, y, 'o');
+    }
+    fillRect(r, 9, 38, 31, 5, 'b');
+    fillRect(r, 10, 37, 29, 2, 'o');
+    fillEllipse(r, 20, 22, 3, 3, 'p');
+    fillEllipse(r, 27, 30, 3, 3, 'p');
+    fillEllipse(r, 23, 36, 2, 2, 'p');
+    fillRect(r, 18, 27, 3, 1, 'h');
+    fillRect(r, 28, 18, 5, 1, 'h');
+    fillRect(r, 22, 12, 3, 1, 'h');
+    return rowsToStrs(r);
+  }
+
+  function makeDiamond() {
+    const r = blank(48, 48);
+    const pts = [
+      [24, 6], [38, 17], [31, 39], [17, 39], [10, 17],
+    ];
+    for (let y = 6; y <= 39; y++) {
+      const topT = Math.max(0, Math.min(1, (y - 6) / 11));
+      const botT = Math.max(0, Math.min(1, (39 - y) / 22));
+      const half = y <= 17 ? Math.round(14 * topT) : Math.round(14 * botT);
+      fillRect(r, 24 - half, y, half * 2 + 1, 1, 'd');
+    }
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      const steps = Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]));
+      for (let s = 0; s <= steps; s++) {
+        const x = Math.round(a[0] + (b[0] - a[0]) * s / steps);
+        const y = Math.round(a[1] + (b[1] - a[1]) * s / steps);
+        setPx(r, x, y, 'o');
+      }
+    }
+    fillRect(r, 17, 17, 15, 1, 'o');
+    fillRect(r, 24, 7, 1, 31, 'h');
+    for (let i = 0; i < 14; i++) {
+      setPx(r, 11 + i, 17 - Math.floor(i * 0.75), 'h');
+      setPx(r, 24 + i, 7 + Math.floor(i * 0.75), 'h');
+      setPx(r, 17 + i, 39 - Math.floor(i * 1.55), 's');
+    }
+    fillRect(r, 17, 12, 9, 2, 'h');
+    fillRect(r, 14, 18, 5, 2, 'h');
+    return rowsToStrs(r);
+  }
+
   function makeDust() {
     // Спрайт «облака пыли» 96×96 (3×3 тайла); рисуем как облачные комки
     const r = blank(96, 96);
@@ -1255,6 +1311,8 @@
   const starPalette = { y: P.starY, o: P.starO, h: P.starHi };
   const broomPalette = { b: P.broomB, h: P.broomH, d: P.broomD };
   const boomboxPalette = { B: P.boomboxB, S: P.boomboxS, A: P.boomboxA, K: P.boomboxK };
+  const pizzaPalette = { c: '#ffd86a', b: '#c46a2a', o: '#8b3f19', p: '#e84242', h: '#fff1a8' };
+  const diamondPalette = { d: '#45d8ff', o: '#08739a', h: '#d8fbff', s: '#1390ca' };
   const dustPalette = { d: P.dust, D: P.dustDark };
 
   G.sprites.powerups = {
@@ -1262,12 +1320,18 @@
     broom:   makeBitmap(makeBroom(),   broomPalette),
     boombox: makeBitmap(makeBoombox(), boomboxPalette),
   };
+  G.sprites.baits = {
+    pizza:   makeBitmap(makePizza(),   pizzaPalette),
+    diamond: makeBitmap(makeDiamond(), diamondPalette),
+  };
   G.sprites.dust = makeBitmap(makeDust(), dustPalette);
   // Алиасы power-up спрайтов в G.sprites.traps — чтобы существующий рендер
   // пикапов и тайл-объектов (uses G.sprites.traps[type]) находил спрайт
   G.sprites.traps.star = G.sprites.powerups.star;
   G.sprites.traps.broom = G.sprites.powerups.broom;
   G.sprites.traps.boombox = G.sprites.powerups.boombox;
+  G.sprites.traps.pizza = G.sprites.baits.pizza;
+  G.sprites.traps.diamond = G.sprites.baits.diamond;
 
   // --- Подсветка пикапов 32×32 (увеличена под TILE=48) ---
 

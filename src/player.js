@@ -24,7 +24,7 @@
       this.stepT = 0;
       this.throwT = 0;
       this.slideT = 0;
-      this.inventory = { mousetrap: 0, puddle: 0, firecracker: 0, trapdoor: 0, banana: 0 };
+      this.inventory = { mousetrap: 0, puddle: 0, firecracker: 0, trapdoor: 0, banana: 0, pizza: 0, diamond: 0 };
       this.selectedTrap = 0;
       // Power-up состояния
       this.starT = 0;           // звезда: бессмертие + 2x скорость
@@ -38,13 +38,15 @@
       this.inventory.puddle = 1;
       this.inventory.trapdoor = 1;
       this.inventory.banana = 1;
+      if (this.character === 'janitor') this.inventory.diamond = 1;
+      if (this.character === 'raccoon') this.inventory.pizza = 1;
     }
 
     get tileX() { return Math.floor(this.x / C.TILE); }
     get tileY() { return Math.floor(this.y / C.TILE); }
 
     selectedType() {
-      return C.TRAP_TYPES[this.selectedTrap];
+      return C.ITEM_TYPES[this.selectedTrap];
     }
 
     addPickup(type) {
@@ -185,11 +187,22 @@
       if (this.input.isDown('up'))    dy -= 1;
       if (this.input.isDown('down'))  dy += 1;
 
+      const pull = traps && traps.pullFor ? traps.pullFor(this.id) : null;
+      if (pull) {
+        const bx = pull.x - this.x;
+        const by = pull.y - this.y;
+        const len = Math.hypot(bx, by) || 1;
+        dx += (bx / len) * C.BAIT_PULL_STRENGTH;
+        dy += (by / len) * C.BAIT_PULL_STRENGTH;
+        if (window.G.particles && Math.random() < 0.22) window.G.particles.spawnDust(this.x, this.y + 10);
+      }
+
       if (dx !== 0 && dy !== 0) {
         const inv = 1 / Math.SQRT2;
         dx *= inv; dy *= inv;
       }
-      const speed = C.PLAYER_SPEED * (this.starT > 0 ? C.STAR_SPEED_MUL : 1);
+      const eventMul = window.G && window.G.arenaEvents && window.G.arenaEvents.speedMul ? window.G.arenaEvents.speedMul() : 1;
+      const speed = C.PLAYER_SPEED * eventMul * (this.starT > 0 ? C.STAR_SPEED_MUL : 1);
       const moved = this.tryMove(dx * speed * dt, 0) | this.tryMove(0, dy * speed * dt);
       this.moving = (dx !== 0 || dy !== 0);
       if (this.moving) {
@@ -216,10 +229,10 @@
 
       // Действия
       if (this.input.wasPressed && this.input.wasPressed('switchNext')) {
-        this.selectedTrap = (this.selectedTrap + 1) % C.TRAP_TYPES.length;
+        this.selectedTrap = (this.selectedTrap + 1) % C.ITEM_TYPES.length;
       }
       if (this.input.wasPressed && this.input.wasPressed('switchPrev')) {
-        const n = C.TRAP_TYPES.length;
+        const n = C.ITEM_TYPES.length;
         this.selectedTrap = (this.selectedTrap - 1 + n) % n;
       }
       if (this.input.wasPressed && this.input.wasPressed('place')) {

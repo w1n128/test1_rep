@@ -41,7 +41,7 @@
       return false;
     }
     spawnRandom() {
-      // С шансом POWERUP_SPAWN_CHANCE — power-up, иначе обычная ловушка
+      // С шансом POWERUP_SPAWN_CHANCE — power-up, иначе обычная ловушка.
       let type;
       if (Math.random() < C.POWERUP_SPAWN_CHANCE) {
         type = C.POWERUP_TYPES[Math.floor(Math.random() * C.POWERUP_TYPES.length)];

@@ -182,6 +182,54 @@
         // глухой деревянный «тук»
         tone(140, 0.08, 'sine', 0.10, 0.01, 80);
         break;
+      case 'trap_mousetrap_hit':
+        if (!canPlay('trap_mousetrap_hit', 160)) return;
+        tone(3600, 0.035, 'square', 0.18, 0, 1200);
+        tone(260, 0.12, 'triangle', 0.16, 0.02, 120);
+        break;
+      case 'trap_puddle_hit':
+        if (!canPlay('trap_puddle_hit', 180)) return;
+        noise(0.20, 0.18, 1400);
+        tone(520, 0.08, 'sine', 0.08, 0.04, 260);
+        tone(340, 0.10, 'sine', 0.06, 0.12, 180);
+        break;
+      case 'trap_banana_hit':
+        if (!canPlay('trap_banana_hit', 180)) return;
+        tone(760, 0.18, 'sine', 0.14, 0, 1600);
+        tone(1450, 0.14, 'sine', 0.10, 0.08, 320);
+        noise(0.08, 0.05, 2500, 0.05);
+        break;
+      case 'trap_trapdoor_hit':
+        if (!canPlay('trap_trapdoor_hit', 220)) return;
+        tone(620, 0.34, 'sine', 0.14, 0, 70);
+        noise(0.18, 0.14, 700, 0.12);
+        break;
+      case 'trap_firecracker_hit':
+        if (!canPlay('trap_firecracker_hit', 220)) return;
+        tone(120, 0.18, 'sawtooth', 0.18, 0, 50);
+        tone(900, 0.06, 'square', 0.10, 0.03, 220);
+        break;
+      case 'bait_pizza':
+        if (!canPlay('bait_pizza', 220)) return;
+        tone(330, 0.08, 'triangle', 0.13);
+        tone(494, 0.08, 'triangle', 0.13, 0.07);
+        tone(659, 0.12, 'triangle', 0.14, 0.14);
+        break;
+      case 'bait_diamond':
+        if (!canPlay('bait_diamond', 220)) return;
+        tone(1200, 0.06, 'sine', 0.12);
+        tone(1800, 0.08, 'sine', 0.11, 0.06);
+        tone(2400, 0.12, 'sine', 0.10, 0.13);
+        break;
+      case 'event_wind':
+        noise(0.45, 0.16, 1800);
+        tone(260, 0.30, 'sine', 0.08, 0, 520);
+        break;
+      case 'event_trash':
+        noise(0.30, 0.18, 900);
+        tone(180, 0.10, 'square', 0.12, 0.04, 90);
+        tone(220, 0.10, 'square', 0.10, 0.16, 120);
+        break;
       case 'menu':
         tone(660, 0.06, 'square', 0.1);
         break;
