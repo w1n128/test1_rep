@@ -983,20 +983,6 @@
     return rowsToStrs(r);
   }
 
-  function makeCone() {
-    const r = blank(48, 48);
-    fillRect(r, 12, 37, 24, 5, 'd');
-    fillRect(r, 15, 34, 18, 4, 'o');
-    for (let y = 10; y < 36; y++) {
-      const half = Math.floor((y - 8) * 0.42);
-      fillRect(r, 24 - half, y, half * 2 + 1, 1, 'o');
-    }
-    fillRect(r, 17, 26, 14, 4, 'w');
-    fillRect(r, 20, 16, 8, 3, 'w');
-    fillRect(r, 21, 8, 6, 4, 'h');
-    fillRect(r, 18, 34, 12, 2, 'h');
-    return rowsToStrs(r);
-  }
 
   function makeTrapdoor() {
     const r = blank(48, 48);
@@ -1065,9 +1051,6 @@
   const branchPalette = {
     w: '#8a4d20', h: '#d7a15a', l: '#4ea64a',
   };
-  const conePalette = {
-    o: '#ff7a18', d: '#9b3a08', w: '#fff1d0', h: '#ffb05a',
-  };
 
   const fallbackTrapSprites = {
     mousetrap:   makeBitmap(makeMousetrap(),   mousetrapPalette),
@@ -1075,7 +1058,6 @@
     trapdoor:    makeBitmap(makeTrapdoor(),    trapdoorPalette),
     banana:      makeBitmap(makeBanana(),      bananaPalette),
     branch:      makeBitmap(makeBranch(),      branchPalette),
-    cone:        makeBitmap(makeCone(),        conePalette),
   };
 
   G.sprites.traps = {
@@ -1084,7 +1066,6 @@
     trapdoor:    loadPngSprite('./assets/traps/trapdoor.png',    fallbackTrapSprites.trapdoor),
     banana:      loadPngSprite('./assets/traps/banana.png',      fallbackTrapSprites.banana),
     branch:      fallbackTrapSprites.branch,
-    cone:        fallbackTrapSprites.cone,
   };
 
   // --- Power-ups 48×48 ---

@@ -15,7 +15,6 @@
       this.hp = C.PLAYER_MAX_HP;
       this.invincibility = 0;
       this.sliding = null;        // { dx, dy }
-      this.coneT = 0;             // конус на голове: стан
       this.fallen = 0;            // секунды в люке
       this.fallReturnAt = null;   // позиция возврата
       this.alive = true;
@@ -26,8 +25,7 @@
       this.throwT = 0;
       this.attackT = 0;
       this.slideT = 0;
-      this.inventory = { mousetrap: 0, firecracker: 0, trapdoor: 0, banana: 0, branch: 0, cone: 0, pizza: 0, diamond: 0 };
-      this.branchHits = 0;
+      this.inventory = { mousetrap: 0, firecracker: 0, trapdoor: 0, banana: 0, branch: 0, pizza: 0, diamond: 0 };
       this.selectedTrap = 0;
       // Power-up состояния
       this.starT = 0;           // звезда: бессмертие + 2x скорость
@@ -41,7 +39,6 @@
       this.inventory.trapdoor = 1;
       this.inventory.banana = 1;
       this.inventory.branch = 1;
-      this.branchHits = C.MELEE_HITS_PER_BRANCH;
       if (this.character === 'janitor') this.inventory.diamond = 1;
       if (this.character === 'raccoon') this.inventory.pizza = 1;
     }
@@ -63,7 +60,6 @@
       if (type === 'branch') {
         if (this.inventory.branch > 0) return false;
         this.inventory.branch = 1;
-        this.branchHits = C.MELEE_HITS_PER_BRANCH;
         return true;
       }
       if (this.inventory[type] >= C.INVENTORY_MAX_PER_TYPE) return false;
@@ -79,7 +75,6 @@
       this.hp = Math.max(0, this.hp - amount);
       this.invincibility = C.INVINCIBILITY_AFTER_HIT;
       this.sliding = null;
-      this.coneT = 0;
       if (window.G && window.G.audio) {
         window.G.audio.play(this.character === 'raccoon' ? 'hurt_raccoon' : 'hurt_janitor');
       }
@@ -125,15 +120,6 @@
       this.fallen = C.TRAPDOOR_FALL_TIME;
       this.fallReturnAt = { x: this.x, y: this.y };
       this.sliding = null;
-      this.coneT = 0;
-    }
-
-    stunWithCone() {
-      if (this.fallen > 0) return;
-      this.sliding = null;
-      this.coneT = C.CONE_STUN_TIME;
-      this.moving = false;
-      this.walkT = 0;
     }
 
     update(dt, traps) {
@@ -147,14 +133,6 @@
         this.starTouchT = Math.max(0, this.starTouchT - dt);
       }
       if (this.hiddenT > 0) this.hiddenT = Math.max(0, this.hiddenT - dt);
-
-      if (this.coneT > 0) {
-        if (this.coneT > 0) this.coneT = Math.max(0, this.coneT - dt);
-        this.walkT += dt * 6;
-        this.moving = false;
-        this.input.consume && this.input.consume();
-        return;
-      }
 
       // === Танец под магнитофон: блокирует движение, лечит ===
       if (this.dancing) {
@@ -298,7 +276,6 @@
         hp: this.hp,
         invincibility: this.invincibility,
         sliding: this.sliding,
-        coneT: this.coneT,
         fallen: this.fallen,
         alive: this.alive,
         walkT: this.walkT,
@@ -307,7 +284,6 @@
         throwT: this.throwT,
         attackT: this.attackT,
         inventory: { ...this.inventory },
-        branchHits: this.branchHits,
         selectedTrap: this.selectedTrap,
         starT: this.starT,
         hiddenT: this.hiddenT,
@@ -321,7 +297,6 @@
       this.hp = s.hp;
       this.invincibility = s.invincibility;
       this.sliding = s.sliding;
-      this.coneT = s.coneT || 0;
       this.fallen = s.fallen;
       this.alive = s.alive;
       this.walkT = s.walkT;
@@ -330,7 +305,6 @@
       this.throwT = s.throwT || 0;
       this.attackT = s.attackT || 0;
       this.inventory = { ...s.inventory };
-      this.branchHits = s.branchHits || 0;
       this.selectedTrap = s.selectedTrap;
       this.starT = s.starT || 0;
       this.hiddenT = s.hiddenT || 0;

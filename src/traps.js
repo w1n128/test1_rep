@@ -200,31 +200,20 @@
       player.attackT = C.MELEE_EFFECT_TIME;
 
       if (G.fx) {
-        G.fx.audio(type === 'cone' ? 'cone_swing' : 'melee_swing');
-        this.effects.push({ kind: type === 'cone' ? 'cone_swing' : 'melee_swing', x: cx, y: cy, dir: player.dir, t: 0, lifetime: C.MELEE_EFFECT_TIME });
+        G.fx.audio('melee_swing');
+        this.effects.push({ kind: 'melee_swing', x: cx, y: cy, dir: player.dir, t: 0, lifetime: C.MELEE_EFFECT_TIME });
       }
       if (!target) return false;
 
       if (type === 'branch') {
-        if (player.branchHits <= 0) return false;
         if (target.damage(1)) {
-          player.branchHits = Math.max(0, player.branchHits - 1);
-          if (player.branchHits <= 0) player.inventory.branch = 0;
+          player.inventory.branch = 0;
           if (G.fx) {
             G.fx.audio(target.character === 'raccoon' ? 'melee_hit_raccoon' : 'melee_hit_janitor');
             G.fx.shake(4, 0.14);
             G.fx.particles('burstStars', target.x, target.y - 14);
             this.effects.push({ kind: 'bonk', x: target.x, y: target.y - 18, t: 0, lifetime: 0.55 });
           }
-        }
-      } else if (type === 'cone') {
-        target.stunWithCone();
-        player.inventory.cone = Math.max(0, player.inventory.cone - 1);
-        if (G.fx) {
-          G.fx.audio('cone_hit');
-          G.fx.shake(3, 0.12);
-          G.fx.particles('burstStars', target.x, target.y - 16);
-          this.effects.push({ kind: 'cone_pop', x: target.x, y: target.y - 20, t: 0, lifetime: 0.55 });
         }
       }
       return true;

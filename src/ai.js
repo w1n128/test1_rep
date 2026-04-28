@@ -99,7 +99,6 @@
 
     pickCombatItem() {
       if (this.player.inventory.branch > 0) return 'branch';
-      if (this.player.inventory.cone > 0) return 'cone';
       return null;
     }
 

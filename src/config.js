@@ -29,7 +29,7 @@
     INVENTORY_MAX_PER_TYPE: 3,
 
     TRAP_TYPES: ['mousetrap', 'firecracker', 'trapdoor', 'banana'],
-    COMBAT_TYPES: ['branch', 'cone'],
+    COMBAT_TYPES: ['branch'],
     get PICKUP_TYPES() { return this.TRAP_TYPES.concat(this.COMBAT_TYPES); },
     get ITEM_TYPES() { return this.TRAP_TYPES.concat(this.COMBAT_TYPES, this.BAIT_TYPES); },
     POWERUP_TYPES: ['star', 'broom', 'boombox'],
@@ -38,8 +38,6 @@
     POWERUP_SPAWN_CHANCE: 0.125,   // star как раньше, broom/boombox в 2 раза чаще
     BAIT_PULL_DURATION: 2.8,
     BAIT_PULL_STRENGTH: 2.4,
-    MELEE_HITS_PER_BRANCH: 3,
-    CONE_STUN_TIME: 1.5,
     MELEE_EFFECT_TIME: 0.22,
     NIGHT_DAY_DURATION: 120.0,      // сколько длится день перед ночью
     NIGHT_DURATION: 60.0,           // длительность ночи

@@ -223,27 +223,17 @@
         ctx.fillRect(Math.round(eff.x - 5), Math.round(eff.y - 5 - k * 8), 3, 6);
         ctx.fillRect(Math.round(eff.x + 3), Math.round(eff.y - 8 - k * 8), 3, 6);
         ctx.restore();
-      } else if (eff.kind === 'melee_swing' || eff.kind === 'cone_swing') {
+      } else if (eff.kind === 'melee_swing') {
         if (!isLitPx(litTiles, eff.x, eff.y)) continue;
         const k = eff.t / eff.lifetime;
-        const sprite = eff.kind === 'cone_swing' ? G.sprites.traps.cone : G.sprites.traps.branch;
-        const size = eff.kind === 'cone_swing' ? 22 : 26;
+        const sprite = G.sprites.traps.branch;
+        const size = 26;
         const angle = eff.dir === 'right' ? 0.6 : eff.dir === 'left' ? -2.55 : eff.dir === 'up' ? -1.2 : 1.95;
         ctx.save();
         ctx.globalAlpha = 0.85 * (1 - k * 0.2);
         ctx.translate(eff.x, eff.y);
         ctx.rotate(angle + (k - 0.5) * 1.0);
         ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
-        ctx.restore();
-      } else if (eff.kind === 'cone_pop') {
-        if (!isLitPx(litTiles, eff.x, eff.y)) continue;
-        const k = eff.t / eff.lifetime;
-        ctx.save();
-        ctx.globalAlpha = 1 - k;
-        ctx.fillStyle = '#ffb05a';
-        ctx.fillRect(Math.round(eff.x - 12), Math.round(eff.y - 4 - k * 10), 24, 3);
-        ctx.fillStyle = '#fff1d0';
-        ctx.fillRect(Math.round(eff.x - 8), Math.round(eff.y - 8 - k * 10), 16, 2);
         ctx.restore();
       }
     }
@@ -354,10 +344,6 @@
     const drawY = Math.round(p.y - drawH / 2);
     if (alpha < 1) ctx.globalAlpha = alpha;
     ctx.drawImage(frame, drawX, drawY, drawW, drawH);
-    if (p.coneT > 0 && G.sprites.traps.cone) {
-      const coneSize = Math.round(drawW * 0.5);
-      ctx.drawImage(G.sprites.traps.cone, Math.round(p.x - coneSize / 2), Math.round(drawY - coneSize * 0.2), coneSize, coneSize);
-    }
     if (alpha < 1) ctx.globalAlpha = 1;
     if (p.starT > 0 && Math.floor(time * 12) % 2 === 1) {
       ctx.globalCompositeOperation = 'lighter';

@@ -200,10 +200,6 @@
         tone(430, 0.05, 'triangle', 0.08, 0.04, 320);
         noise(0.05, 0.05, 1200, 0.02);
         break;
-      case 'pickup_cone':
-        tone(520, 0.05, 'square', 0.10);
-        tone(740, 0.06, 'square', 0.08, 0.05, 560);
-        break;
       case 'place':
         tone(220, 0.08, 'square', 0.12);
         noise(0.05, 0.04, 600);
@@ -225,17 +221,6 @@
         if (!canPlay('melee_swing', 120)) return;
         noise(0.10, 0.09, 2200);
         tone(360, 0.08, 'sine', 0.05, 0, 620);
-        break;
-      case 'cone_swing':
-        if (!canPlay('cone_swing', 120)) return;
-        tone(520, 0.06, 'square', 0.08, 0, 720);
-        noise(0.08, 0.05, 1800);
-        break;
-      case 'cone_hit':
-        if (!canPlay('cone_hit', 180)) return;
-        tone(620, 0.08, 'square', 0.14);
-        tone(360, 0.10, 'square', 0.10, 0.06, 180);
-        noise(0.08, 0.08, 900, 0.04);
         break;
       case 'melee_hit_janitor':
         if (!canPlay('melee_hit_janitor', 220)) return;
