@@ -252,6 +252,9 @@
         lobbyCode = code;
         lobbyStatus = 'Жду друга...';
       },
+      onPending: () => {
+        lobbyStatus = 'Друг найден, открываем канал...';
+      },
       onConnect: () => {
         // Клиент подключился — стартуем матч
         G.net.send({ t: 'hello', v: G.net.PROTOCOL_VERSION });
@@ -260,7 +263,9 @@
       onMessage: onNetMessage,
       onClose: onNetClose,
       onError: (err) => {
-        lobbyStatus = 'Ошибка: ' + (err && err.type ? err.type : err);
+        const t = err && err.type ? err.type : '';
+        if (t === 'timeout') lobbyStatus = 'Не удалось открыть канал. Попробуйте обновить обе страницы.';
+        else lobbyStatus = 'Ошибка: ' + (t || err);
       },
     });
   }
@@ -283,7 +288,7 @@
       onError: (err) => {
         const t = err && err.type ? err.type : '';
         if (t === 'peer-unavailable') lobbyStatus = 'Комнаты с таким кодом нет';
-        else if (t === 'timeout') lobbyStatus = 'Не удалось подключиться за 10 сек. Проверьте код и обновите страницу.';
+        else if (t === 'timeout') lobbyStatus = 'Не удалось подключиться за 20 сек. Проверьте код и обновите страницу.';
         else lobbyStatus = 'Ошибка: ' + (t || err);
       },
     });

@@ -7,6 +7,7 @@
   const PROTOCOL_VERSION = 1;
   const ROOM_PREFIX = 'tjvse-'; // префикс к коду чтобы не пересекаться с чужими peer-id
   const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // без 0/O/1/I/L
+  const CONNECT_TIMEOUT_MS = 20000;
 
   function generateCode(len = 6) {
     let s = '';
@@ -44,6 +45,7 @@
   let onClosedCb = null;
   let onConnectedCb = null;
   let lastError = null;
+  let connReady = false;
 
   function ensurePeer(id) {
     if (typeof Peer === 'undefined') {
@@ -74,6 +76,7 @@
 
   function setupConn(c) {
     conn = c;
+    connReady = false;
     conn.on('data', (data) => {
       try {
         if (typeof data === 'string') data = JSON.parse(data);
@@ -89,6 +92,40 @@
       if (onClosedCb) onClosedCb('error: ' + err.type);
       teardown();
     });
+  }
+
+  function waitForOpen(c, onOpen, onTimeout) {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearInterval(poll);
+      clearTimeout(timeout);
+      connReady = true;
+      onOpen();
+    };
+    const fail = () => {
+      if (done) return;
+      done = true;
+      clearInterval(poll);
+      const err = { type: 'timeout' };
+      lastError = err;
+      if (onTimeout) onTimeout(err);
+    };
+    const poll = setInterval(() => {
+      if (c.open) finish();
+    }, 100);
+    const timeout = setTimeout(fail, CONNECT_TIMEOUT_MS);
+    c.on('open', finish);
+    c.on('error', (err) => {
+      if (done) return;
+      done = true;
+      clearInterval(poll);
+      clearTimeout(timeout);
+      lastError = err;
+      if (onTimeout) onTimeout(err);
+    });
+    if (c.open) finish();
   }
 
   function host(opts) {
@@ -109,7 +146,12 @@
         c.close(); return; // только 1 клиент
       }
       setupConn(c);
-      if (onConnectedCb) onConnectedCb();
+      if (opts.onPending) opts.onPending();
+      waitForOpen(
+        c,
+        () => { if (onConnectedCb) onConnectedCb(); },
+        (err) => { if (opts.onError) opts.onError(err); }
+      );
     });
     peer.on('error', (err) => {
       lastError = err;
@@ -129,29 +171,19 @@
     const targetId = ROOM_PREFIX + roomCode;
     const myId = ROOM_PREFIX + roomCode + '-c-' + Math.random().toString(36).slice(2, 7);
     peer = ensurePeer(myId);
-    const timeout = setTimeout(() => {
-      if (!conn || !conn.open) {
-        const err = { type: 'timeout' };
-        lastError = err;
-        if (opts.onError) opts.onError(err);
-      }
-    }, 10000);
     peer.on('open', () => {
       const c = peer.connect(targetId, { reliable: true });
-      c.on('open', () => {
-        clearTimeout(timeout);
-        setupConn(c);
-        if (onConnectedCb) onConnectedCb();
-        if (opts.onReady) opts.onReady(roomCode);
-      });
-      c.on('error', (err) => {
-        clearTimeout(timeout);
-        lastError = err;
-        if (opts.onError) opts.onError(err);
-      });
+      setupConn(c);
+      waitForOpen(
+        c,
+        () => {
+          if (onConnectedCb) onConnectedCb();
+          if (opts.onReady) opts.onReady(roomCode);
+        },
+        (err) => { if (opts.onError) opts.onError(err); }
+      );
     });
     peer.on('error', (err) => {
-      clearTimeout(timeout);
       lastError = err;
       if (opts.onError) opts.onError(err);
     });
@@ -174,6 +206,7 @@
     peer = null;
     role = null;
     roomCode = null;
+    connReady = false;
   }
 
   function disconnect() {
@@ -182,7 +215,7 @@
 
   function isHost() { return role === 'host'; }
   function isClient() { return role === 'client'; }
-  function isConnected() { return !!(conn && conn.open); }
+  function isConnected() { return !!(conn && conn.open && connReady); }
   function getRole() { return role; }
   function getCode() { return roomCode; }
   function getError() { return lastError; }
