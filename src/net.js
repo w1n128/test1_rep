@@ -56,7 +56,7 @@
       throw new Error('PeerJS не загружен. Проверь интернет и CDN-скрипт в index.html.');
     }
     return new Peer(id, {
-      debug: 0,
+      debug: 3,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
@@ -89,6 +89,31 @@
   function setupConn(c) {
     conn = c;
     connReady = false;
+    // Diagnostic: log ICE state changes
+    try {
+      const pc = c.peerConnection;
+      if (pc) {
+        pc.addEventListener('iceconnectionstatechange', () => {
+          console.log('[net] iceConnectionState =', pc.iceConnectionState);
+        });
+        pc.addEventListener('icegatheringstatechange', () => {
+          console.log('[net] iceGatheringState =', pc.iceGatheringState);
+        });
+        pc.addEventListener('icecandidate', (ev) => {
+          if (ev.candidate) {
+            console.log('[net] candidate:', ev.candidate.candidate);
+          } else {
+            console.log('[net] candidate: end-of-candidates');
+          }
+        });
+        pc.addEventListener('icecandidateerror', (ev) => {
+          console.warn('[net] icecandidateerror:', ev.url, 'code', ev.errorCode, ev.errorText);
+        });
+      } else {
+        // PeerJS sometimes lazily creates peerConnection — try again on signal
+        c.on('iceStateChanged', (s) => console.log('[net] (peerjs) iceStateChanged =', s));
+      }
+    } catch (e) { console.warn('[net] cannot attach diagnostics:', e); }
     conn.on('data', (data) => {
       try {
         if (typeof data === 'string') data = JSON.parse(data);
