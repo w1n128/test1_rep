@@ -101,6 +101,70 @@
     tone(430, 0.9, 'sine', 0.035, when + 0.75, 260);
   }
 
+  function filteredNoise(dur, vol = 0.15, filterFreq = 2000, when = 0, dest = 'sfx', type = 'bandpass', q = 1.0) {
+    const t0 = ctx.currentTime + when;
+    const sr = ctx.sampleRate;
+    const len = Math.max(1, Math.floor(sr * dur));
+    const buf = ctx.createBuffer(1, len, sr);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+      const k = 1 - i / len;
+      d[i] = (Math.random() * 2 - 1) * k * k;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filter = ctx.createBiquadFilter();
+    filter.type = type;
+    filter.frequency.value = filterFreq;
+    filter.Q.value = q;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0005, t0 + dur);
+    src.connect(filter);
+    filter.connect(g);
+    g.connect(out(dest));
+    src.start(t0);
+  }
+
+  function whipCrack() {
+    filteredNoise(0.045, 0.16, 4200, 0.000, 'sfx', 'highpass', 0.7);
+    filteredNoise(0.026, 0.34, 9200, 0.030, 'sfx', 'bandpass', 6.5);
+    filteredNoise(0.018, 0.20, 6200, 0.052, 'sfx', 'bandpass', 5.0);
+    tone(1800, 0.030, 'square', 0.075, 0.020, 4200);
+    tone(3200, 0.018, 'triangle', 0.060, 0.047, 1600);
+  }
+
+  function janitorAouch() {
+    tone(360, 0.115, 'sawtooth', 0.18, 0.000, 300);
+    tone(720, 0.090, 'triangle', 0.075, 0.018, 580);
+    tone(520, 0.085, 'square', 0.10, 0.105, 390);
+    filteredNoise(0.035, 0.030, 1800, 0.145, 'sfx', 'bandpass', 1.8);
+  }
+
+  function raccoonAouch() {
+    tone(980, 0.095, 'square', 0.15, 0.000, 1320);
+    tone(1480, 0.070, 'triangle', 0.080, 0.030, 950);
+    tone(760, 0.090, 'square', 0.095, 0.105, 620);
+    filteredNoise(0.030, 0.025, 3200, 0.150, 'sfx', 'bandpass', 2.5);
+  }
+
+  function startJingle() {
+    tone(523, 0.09, 'triangle', 0.12, 0.00);
+    tone(659, 0.09, 'triangle', 0.12, 0.08);
+    tone(784, 0.11, 'triangle', 0.13, 0.16);
+    tone(1047, 0.18, 'square', 0.14, 0.26);
+    filteredNoise(0.12, 0.04, 6000, 0.30, 'sfx', 'highpass', 0.8);
+  }
+
+  function endJingle() {
+    tone(1047, 0.12, 'triangle', 0.13, 0.00);
+    tone(784, 0.12, 'triangle', 0.12, 0.10);
+    tone(659, 0.14, 'triangle', 0.12, 0.20);
+    tone(523, 0.28, 'sine', 0.15, 0.32);
+    tone(262, 0.24, 'sine', 0.08, 0.36);
+  }
+
   // Пицц-нота с быстрой атакой и затуханием — для бас-линии и марионеточного «мяуу».
   function pluck(freq, dur, vol = 0.18, when = 0, dest = 'music') {
     const t0 = ctx.currentTime + when;
@@ -219,32 +283,27 @@
         break;
       case 'melee_swing':
         if (!canPlay('melee_swing', 120)) return;
-        noise(0.10, 0.09, 2200);
-        tone(360, 0.08, 'sine', 0.05, 0, 620);
+        whipCrack();
         break;
       case 'melee_hit_janitor':
         if (!canPlay('melee_hit_janitor', 220)) return;
-        tone(150, 0.20, 'sawtooth', 0.24, 0, 80);
-        tone(230, 0.08, 'square', 0.12, 0.04, 130);
-        noise(0.05, 0.06, 700, 0.03);
+        filteredNoise(0.030, 0.24, 7800, 0.000, 'sfx', 'bandpass', 5.5);
+        tone(2400, 0.024, 'square', 0.075, 0.004, 1200);
         break;
       case 'melee_hit_raccoon':
         if (!canPlay('melee_hit_raccoon', 220)) return;
-        tone(1350, 0.10, 'square', 0.18, 0, 1850);
-        tone(900, 0.08, 'sine', 0.10, 0.06, 520);
+        filteredNoise(0.026, 0.20, 8600, 0.000, 'sfx', 'bandpass', 5.5);
+        tone(2900, 0.022, 'square', 0.065, 0.004, 1500);
         break;
       // --- Реакция дворника на боль: грубое низкое «ой!» ---
       case 'hurt_janitor':
         if (!canPlay('hurt_janitor', 250)) return;
-        tone(180, 0.18, 'sawtooth', 0.22, 0, 90);
-        tone(240, 0.10, 'square', 0.12, 0.02, 140);
-        noise(0.06, 0.06, 800, 0.02);
+        janitorAouch();
         break;
       // --- Реакция енота на боль: высокий писк «ии!» ---
       case 'hurt_raccoon':
         if (!canPlay('hurt_raccoon', 250)) return;
-        tone(1200, 0.12, 'square', 0.16, 0, 1700);
-        tone(1500, 0.08, 'sine', 0.10, 0.04, 900);
+        raccoonAouch();
         break;
       // --- Резкий металлический щелчок мышеловки ---
       case 'mousetrap_snap':
@@ -302,6 +361,14 @@
         break;
       case 'menu':
         tone(660, 0.06, 'square', 0.1);
+        break;
+      case 'game_start':
+        if (!canPlay('game_start', 500)) return;
+        startJingle();
+        break;
+      case 'game_end':
+        if (!canPlay('game_end', 500)) return;
+        endJingle();
         break;
       // --- Power-up: звезда (восходящая фанфара) ---
       case 'star':
@@ -412,11 +479,25 @@
     },
   ];
 
+  const MENU_PATTERNS = [
+    {
+      bass:  ['C3', null, null, null, 'G3', null, null, null, 'A3', null, null, null, 'F3', null, null, null],
+      lead:  ['E5', 'G5', 'C6', null, 'D5', 'G5', 'B5', null, 'E5', 'A5', 'C6', null, 'C5', 'F5', 'A5', null],
+      shimmer: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+    },
+    {
+      bass:  ['F3', null, null, null, 'C3', null, null, null, 'G3', null, null, null, 'C3', null, null, null],
+      lead:  ['F5', 'A5', 'C6', null, 'E5', 'G5', 'C6', null, 'D5', 'G5', 'B5', null, 'E5', 'G5', 'C6', null],
+      shimmer: [1,0,0,1, 1,0,0,1, 1,0,0,1, 1,0,1,0],
+    },
+  ];
+
   const TEMPO_BPM = 152;
   const TEMPO_DISCO_BPM = 124;
+  const TEMPO_MENU_BPM = 86;
   let STEP_SEC = 60 / TEMPO_BPM / 4; // 16-я нота — пересчитываем при смене режима
   const PATTERN_LEN = 16;
-  let mode = 'chase'; // 'chase' | 'disco'
+  let mode = 'chase'; // 'chase' | 'disco' | 'menu'
   let starBoost = false;
 
   let musicTimer = null;
@@ -426,14 +507,28 @@
   let scheduledUpTo = 0;
 
   function refreshStepSec() {
-    const bpm = mode === 'disco' ? TEMPO_DISCO_BPM : TEMPO_BPM;
+    const bpm = mode === 'menu' ? TEMPO_MENU_BPM : mode === 'disco' ? TEMPO_DISCO_BPM : TEMPO_BPM;
     const mul = starBoost && window.G && window.G.config ? window.G.config.STAR_MUSIC_SPEED_MUL : 1;
     STEP_SEC = 60 / (bpm * mul) / 4;
   }
 
   function playStep(patternIdx, step, when) {
-    const patterns = mode === 'disco' ? DISCO_PATTERNS : PATTERNS;
+    const patterns = mode === 'menu' ? MENU_PATTERNS : mode === 'disco' ? DISCO_PATTERNS : PATTERNS;
     const p = patterns[patternIdx % patterns.length];
+    if (mode === 'menu') {
+      if (p.bass[step]) {
+        pluck(n(p.bass[step]), 0.55, 0.10, when, 'music');
+        tone(n(p.bass[step]) * 0.5, 0.80, 'sine', 0.035, when, null, 'music');
+      }
+      if (p.lead[step]) {
+        tone(n(p.lead[step]), 0.38, 'sine', 0.055, when, null, 'music');
+        tone(n(p.lead[step]) * 2, 0.26, 'triangle', 0.025, when + 0.04, null, 'music');
+      }
+      if (p.shimmer && p.shimmer[step]) {
+        filteredNoise(0.08, 0.012, 6800, when, 'music', 'highpass', 0.7);
+      }
+      return;
+    }
     // Бас
     if (p.bass[step]) {
       if (mode === 'disco') {
@@ -497,11 +592,12 @@
     }
   }
 
-  function startMusic() {
+  function startMusic(newMode = 'chase') {
     if (!ensure()) return;
-    if (musicTimer) return;
+    if (newMode !== 'chase' && newMode !== 'disco' && newMode !== 'menu') newMode = 'chase';
+    if (musicTimer && mode === newMode) return;
     if (ctx.state === 'suspended') ctx.resume();
-    mode = 'chase';
+    mode = newMode;
     starBoost = false;
     refreshStepSec();
     stepIdx = 0;
@@ -524,7 +620,7 @@
   }
 
   function setMode(newMode) {
-    if (newMode !== 'chase' && newMode !== 'disco') return;
+    if (newMode !== 'chase' && newMode !== 'disco' && newMode !== 'menu') return;
     if (mode === newMode) return;
     mode = newMode;
     refreshStepSec();

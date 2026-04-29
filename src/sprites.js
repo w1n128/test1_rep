@@ -463,6 +463,32 @@
       // Весёлый открытый рот во время танца.
       fillRect(r, 22, 20, 4, 2, 'S');
       fillRect(r, 23, 21, 2, 1, 'M');
+    } else if (pose === 'menu_run') {
+      if (dir === 'left') {
+        if (frame === 0) {
+          fillRect(r, 2, 24, 13, 4, 'j');
+          fillRect(r, 2, 25, 4, 3, 's');
+          fillRect(r, 33, 29, 11, 3, 'J');
+          fillRect(r, 41, 29, 3, 2, 's');
+        } else {
+          fillRect(r, 2, 30, 12, 3, 'J');
+          fillRect(r, 2, 30, 3, 2, 's');
+          fillRect(r, 34, 23, 11, 4, 'j');
+          fillRect(r, 42, 24, 3, 2, 's');
+        }
+      } else {
+        if (frame === 0) {
+          fillRect(r, 33, 24, 13, 4, 'j');
+          fillRect(r, 42, 25, 4, 3, 's');
+          fillRect(r, 4, 29, 11, 3, 'J');
+          fillRect(r, 4, 29, 3, 2, 's');
+        } else {
+          fillRect(r, 34, 30, 12, 3, 'J');
+          fillRect(r, 43, 30, 3, 2, 's');
+          fillRect(r, 3, 23, 11, 4, 'j');
+          fillRect(r, 3, 24, 3, 2, 's');
+        }
+      }
     } else if (pose === 'melee') {
       fillRect(r, 7, 27, 3, 7, 'j');
       if (dir === 'left') {
@@ -546,7 +572,20 @@
     fillRect(r, 34, 36, 1, 8, 'P');
 
     // === Ноги + ботинки (rows 43-47) ===
-    if (frame === 0) {
+    if (pose === 'menu_run') {
+      if (frame === 0) {
+        fillRect(r, 8, 39, 13, 4, 'p');
+        fillRect(r, 5, 42, 12, 5, 'b');
+        fillRect(r, 25, 40, 11, 3, 'P');
+        fillRect(r, 34, 41, 10, 4, 'b');
+      } else {
+        fillRect(r, 27, 39, 13, 4, 'p');
+        fillRect(r, 33, 42, 12, 5, 'b');
+        fillRect(r, 10, 40, 11, 3, 'P');
+        fillRect(r, 4, 41, 10, 4, 'b');
+      }
+      fillRect(r, 10, 46, 34, 2, 'P');
+    } else if (frame === 0) {
       // Стойка
       fillRect(r, 13, 43, 9, 1, 'p');
       fillRect(r, 26, 43, 9, 1, 'p');
@@ -562,6 +601,71 @@
       fillRect(r, 13, 45, 9, 3, 'b');
       fillRect(r, 26, 44, 9, 4, 'b');
     }
+
+    return rowsToStrs(r);
+  }
+
+  function makeJanitorMenuRun(frame) {
+    const r = blank(48, 48);
+
+    // Ноги: профильный бег вправо, кадры зеркалят вынос ног.
+    if (frame === 0) {
+      fillRect(r, 16, 37, 10, 3, 'P');
+      fillRect(r, 8, 40, 13, 5, 'b');
+      fillRect(r, 27, 37, 11, 4, 'p');
+      fillRect(r, 36, 41, 10, 5, 'b');
+    } else {
+      fillRect(r, 25, 37, 11, 3, 'P');
+      fillRect(r, 34, 40, 12, 5, 'b');
+      fillRect(r, 13, 37, 11, 4, 'p');
+      fillRect(r, 5, 41, 11, 5, 'b');
+    }
+
+    // Задняя рука.
+    if (frame === 0) {
+      fillRect(r, 10, 28, 10, 3, 'J');
+      fillRect(r, 8, 29, 3, 2, 's');
+    } else {
+      fillRect(r, 31, 27, 12, 4, 'J');
+      fillRect(r, 41, 28, 4, 2, 's');
+    }
+
+    // Корпус в профиль, наклонён вперёд.
+    fillRect(r, 17, 23, 18, 14, 'j');
+    fillRect(r, 15, 25, 3, 10, 'J');
+    fillRect(r, 25, 24, 8, 12, 'v');
+    fillRect(r, 25, 27, 8, 1, 'V');
+    fillRect(r, 25, 32, 8, 1, 'V');
+    fillRect(r, 18, 22, 12, 2, 'J');
+
+    // Передняя рука.
+    if (frame === 0) {
+      fillRect(r, 30, 26, 13, 4, 'j');
+      fillRect(r, 41, 27, 4, 3, 's');
+    } else {
+      fillRect(r, 8, 30, 12, 3, 'j');
+      fillRect(r, 6, 30, 3, 2, 's');
+    }
+
+    // Голова строго в профиль вправо.
+    fillRect(r, 20, 10, 14, 11, 's');
+    fillRect(r, 18, 12, 3, 7, 's');
+    fillRect(r, 33, 14, 5, 3, 's');
+    fillRect(r, 34, 17, 2, 1, 'S');
+    fillRect(r, 18, 18, 17, 4, 'B');
+    fillRect(r, 24, 19, 12, 2, 'B');
+    fillRect(r, 27, 15, 3, 2, 'M');
+    fillRect(r, 26, 14, 5, 1, 'B');
+    setPx(r, 28, 15, 's');
+
+    // Кепка с козырьком вправо.
+    fillRect(r, 18, 3, 18, 5, 'e');
+    fillRect(r, 20, 1, 14, 2, 'e');
+    fillRect(r, 17, 7, 20, 2, 'E');
+    fillRect(r, 35, 8, 8, 2, 'E');
+    fillRect(r, 19, 2, 15, 1, 'E');
+    setPx(r, 17, 4, 'E');
+    setPx(r, 36, 5, 'E');
 
     return rowsToStrs(r);
   }
@@ -592,6 +696,7 @@
     melee_up:    jb(makeJanitor('up',    0, 'melee')),
     melee_left:  jb(makeJanitor('left',  0, 'melee')),
     melee_right: jb(flipH(makeJanitor('left', 0, 'melee'))),
+    menu_run: [jb(makeJanitorMenuRun(0)), jb(makeJanitorMenuRun(1))],
     slide_down:  jb(makeJanitor('down',  0, 'slide')),
     slide_up:    jb(makeJanitor('up',    0, 'slide')),
     slide_left:  jb(makeJanitor('left',  0, 'slide')),
@@ -802,6 +907,48 @@
       fillRect(r, 29, 39, 6, 5, 'R');
       fillRect(r, 13, 43, 6, 2, 'm');
       fillRect(r, 29, 43, 6, 2, 'm');
+    } else if (pose === 'menu_run') {
+      if (dir === 'left') {
+        if (frame === 0) {
+          fillRect(r, 1, 27, 12, 4, 'R');
+          fillRect(r, 1, 28, 4, 2, 'w');
+          fillRect(r, 34, 31, 11, 3, 'R');
+          fillRect(r, 42, 31, 3, 2, 'm');
+          fillRect(r, 9, 38, 12, 5, 'R');
+          fillRect(r, 5, 42, 13, 3, 'm');
+          fillRect(r, 29, 38, 10, 4, 'R');
+          fillRect(r, 37, 41, 8, 3, 'm');
+        } else {
+          fillRect(r, 2, 31, 11, 3, 'R');
+          fillRect(r, 2, 31, 3, 2, 'w');
+          fillRect(r, 35, 26, 11, 4, 'R');
+          fillRect(r, 43, 27, 3, 2, 'm');
+          fillRect(r, 29, 38, 12, 5, 'R');
+          fillRect(r, 34, 42, 13, 3, 'm');
+          fillRect(r, 10, 38, 10, 4, 'R');
+          fillRect(r, 3, 41, 9, 3, 'm');
+        }
+      } else {
+        if (frame === 0) {
+          fillRect(r, 35, 27, 12, 4, 'R');
+          fillRect(r, 43, 28, 4, 2, 'w');
+          fillRect(r, 3, 31, 11, 3, 'R');
+          fillRect(r, 3, 31, 3, 2, 'm');
+          fillRect(r, 27, 38, 12, 5, 'R');
+          fillRect(r, 30, 42, 13, 3, 'm');
+          fillRect(r, 9, 38, 10, 4, 'R');
+          fillRect(r, 3, 41, 8, 3, 'm');
+        } else {
+          fillRect(r, 35, 31, 11, 3, 'R');
+          fillRect(r, 43, 31, 3, 2, 'w');
+          fillRect(r, 2, 26, 11, 4, 'R');
+          fillRect(r, 2, 27, 3, 2, 'm');
+          fillRect(r, 7, 38, 12, 5, 'R');
+          fillRect(r, 1, 42, 13, 3, 'm');
+          fillRect(r, 28, 38, 10, 4, 'R');
+          fillRect(r, 36, 41, 9, 3, 'm');
+        }
+      }
     } else if (pose === 'melee') {
       // Задние лапы стоят
       fillRect(r, 13, 38, 6, 7, 'R');
@@ -882,6 +1029,81 @@
     return scaleRowsX(r, 0.86);
   }
 
+  function makeRaccoonMenuRun(frame) {
+    const r = blank(48, 48);
+
+    // Хвост позади тела, чтобы профиль читался сразу.
+    fillRect(r, 2, 23, 14, 12, 'r');
+    fillRect(r, 0, 26, 4, 6, 'r');
+    fillRect(r, 2, 22, 13, 1, 'R');
+    fillRect(r, 1, 34, 14, 1, 'R');
+    fillRect(r, 3, 25, 11, 2, 'm');
+    fillRect(r, 2, 30, 12, 2, 'm');
+    fillRect(r, 0, 27, 4, 3, 'm');
+
+    // Ноги и лапы в фазе бега.
+    if (frame === 0) {
+      fillRect(r, 14, 38, 12, 4, 'R');
+      fillRect(r, 7, 42, 14, 3, 'm');
+      fillRect(r, 29, 37, 10, 4, 'r');
+      fillRect(r, 37, 40, 9, 4, 'm');
+    } else {
+      fillRect(r, 27, 38, 12, 4, 'R');
+      fillRect(r, 34, 42, 13, 3, 'm');
+      fillRect(r, 13, 37, 10, 4, 'r');
+      fillRect(r, 5, 40, 10, 4, 'm');
+    }
+
+    // Задняя лапа-рука.
+    if (frame === 0) {
+      fillRect(r, 11, 29, 10, 3, 'R');
+      fillRect(r, 8, 30, 4, 2, 'm');
+    } else {
+      fillRect(r, 31, 28, 11, 4, 'R');
+      fillRect(r, 40, 29, 4, 2, 'm');
+    }
+
+    // Тело в профиль, не фронтальная "майка".
+    fillRect(r, 17, 22, 19, 16, 'r');
+    fillRect(r, 16, 24, 2, 12, 'R');
+    fillRect(r, 34, 24, 2, 12, 'R');
+    fillRect(r, 21, 25, 12, 10, 'w');
+    fillRect(r, 31, 25, 2, 10, 'R');
+    fillRect(r, 17, 22, 18, 1, 'R');
+    fillRect(r, 18, 37, 17, 1, 'R');
+
+    // Передняя лапа-рука.
+    if (frame === 0) {
+      fillRect(r, 31, 27, 12, 4, 'R');
+      fillRect(r, 41, 28, 4, 2, 'w');
+    } else {
+      fillRect(r, 9, 31, 11, 3, 'R');
+      fillRect(r, 7, 31, 3, 2, 'w');
+    }
+
+    // Голова в профиль вправо: один глаз, нос и ухмылка.
+    fillRect(r, 20, 7, 15, 14, 'r');
+    fillRect(r, 18, 10, 3, 8, 'r');
+    fillRect(r, 34, 12, 5, 5, 'w');
+    fillRect(r, 37, 14, 4, 3, 'm');
+    fillRect(r, 23, 11, 12, 4, 'm');
+    fillRect(r, 27, 12, 4, 3, 'w');
+    fillRect(r, 29, 13, 2, 2, 'm');
+    setPx(r, 28, 13, 'w');
+    fillRect(r, 32, 18, 5, 1, 'm');
+    setPx(r, 37, 17, 'm');
+
+    // Уши в профиль.
+    fillRect(r, 19, 2, 7, 6, 'r');
+    fillRect(r, 21, 1, 4, 1, 'R');
+    fillRect(r, 20, 4, 4, 3, 'm');
+    fillRect(r, 31, 3, 7, 6, 'r');
+    fillRect(r, 33, 2, 4, 1, 'R');
+    fillRect(r, 33, 5, 3, 3, 'm');
+
+    return scaleRowsX(rowsToStrs(r), 0.88);
+  }
+
   const raccoonPalette = {
     r: P.raccoon1,
     R: P.raccoon2,
@@ -906,6 +1128,7 @@
     melee_up:    rb(makeRaccoon('up',    0, 'melee')),
     melee_left:  rb(makeRaccoon('left',  0, 'melee')),
     melee_right: rb(flipH(makeRaccoon('left', 0, 'melee'))),
+    menu_run: [rb(makeRaccoonMenuRun(0)), rb(makeRaccoonMenuRun(1))],
     slide_down:  rb(makeRaccoon('down',  0, 'slide')),
     slide_up:    rb(makeRaccoon('up',    0, 'slide')),
     slide_left:  rb(makeRaccoon('left',  0, 'slide')),

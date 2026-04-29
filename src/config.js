@@ -39,7 +39,8 @@
     BAIT_PULL_DURATION: 2.8,
     BAIT_PULL_STRENGTH: 2.4,
     MELEE_EFFECT_TIME: 0.22,
-    NIGHT_DAY_DURATION: 120.0,      // сколько длится день перед ночью
+    PREGAME_RULES_DURATION: 5.0,    // экран кратких правил перед стартом
+    NIGHT_DAY_DURATION: 90.0,       // сколько длится день перед ночью
     NIGHT_DURATION: 60.0,           // длительность ночи
     FLASHLIGHT_TILES: 3,            // дальность фонарика в тайлах
     STAR_DURATION: 10.0,           // секунды бессмертия

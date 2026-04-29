@@ -11,7 +11,12 @@
 
   // Инициализация WebAudio при первом нажатии (требование браузера).
   function initAudioOnce() {
-    if (G.audio) G.audio.init();
+    if (G.audio) {
+      G.audio.init();
+      if (G.audio.music && (state === STATE.MENU || state === STATE.MENU_NET || state === STATE.NET_LOBBY_HOST || state === STATE.NET_LOBBY_JOIN)) {
+        G.audio.music.start('menu');
+      }
+    }
     window.removeEventListener('keydown', initAudioOnce);
     window.removeEventListener('mousedown', initAudioOnce);
   }
@@ -61,6 +66,7 @@
     MENU_NET: 'menu_net',
     NET_LOBBY_HOST: 'net_lobby_host',
     NET_LOBBY_JOIN: 'net_lobby_join',
+    INTRO: 'intro',
     PLAYING: 'playing',
     PAUSED: 'paused',
     GAMEOVER: 'gameover',
@@ -84,6 +90,7 @@
   let winnerId = null;
   let time = 0;
   let matchTime = 0;
+  let introT = 0;
 
   function syncReactiveMusic() {
     if (!G.audio || !G.audio.music || !players.length) return;
@@ -147,9 +154,10 @@
     winnerId = null;
     snapshotInterval = 0;
     matchTime = 0;
-    state = STATE.PLAYING;
-    if (G.audio && G.audio.music) G.audio.music.start();
-    syncReactiveMusic();
+    introT = C.PREGAME_RULES_DURATION;
+    state = STATE.INTRO;
+    if (G.audio && G.audio.music) G.audio.music.stop();
+    if (G.audio) G.audio.play('game_start');
   }
 
   // Локальный игрок (для камеры/ввода) в сетевом режиме.
@@ -171,7 +179,7 @@
     G.pickupManager = null;
     G.arenaEvents = null;
     if (G.particles) G.particles.clear();
-    if (G.audio && G.audio.music) G.audio.music.stop();
+    if (G.audio && G.audio.music) G.audio.music.start('menu');
     if (G.net && G.net.disconnect) G.net.disconnect();
   }
 
@@ -206,6 +214,7 @@
       winnerId = msg.winnerId;
       state = STATE.GAMEOVER;
       if (G.audio && G.audio.music) G.audio.music.stop();
+      if (G.audio) G.audio.play('game_end');
       return;
     }
     if (msg.t === 'pause' && netRole === 'client') {
@@ -234,7 +243,7 @@
 
   function onNetClose(reason) {
     lobbyDisconnectMsg = 'Соперник отключился';
-    if (state === STATE.PLAYING || state === STATE.PAUSED || state === STATE.GAMEOVER) {
+    if (state === STATE.INTRO || state === STATE.PLAYING || state === STATE.PAUSED || state === STATE.GAMEOVER) {
       // Возврат в меню с сообщением через короткую паузу
       setTimeout(() => returnToMenu(), 1500);
     } else {
@@ -381,6 +390,17 @@
       return;
     }
 
+    if (state === STATE.INTRO) {
+      if (G.input.sys.wasPressed('menu'))  { returnToMenu(); return; }
+      introT = Math.max(0, introT - dt);
+      if (introT <= 0) {
+        state = STATE.PLAYING;
+        if (G.audio && G.audio.music) G.audio.music.start('chase');
+        syncReactiveMusic();
+      }
+      return;
+    }
+
     if (state === STATE.PLAYING) {
       // Пауза — обе стороны могут запросить, но истинная пауза идёт через хоста.
       if (G.input.sys.wasPressed('pause')) {
@@ -481,6 +501,7 @@
           G.net.send({ t: 'gameover', winnerId });
         }
         if (G.audio && G.audio.music) G.audio.music.stop();
+        if (G.audio) G.audio.play('game_end');
       }
       return;
     }
@@ -526,13 +547,14 @@
     } else if (state === STATE.NET_LOBBY_JOIN) {
       drawNetLobbyJoin();
     } else {
-      // PLAYING / PAUSED / GAMEOVER
+      // INTRO / PLAYING / PAUSED / GAMEOVER
       if (mode === 'net') {
         const me = localNetPlayer();
         if (me) G.render.drawSingleScreen(ctx, me, players, trapManager, pickupManager, time, matchTime, arenaEventManager);
       } else {
         G.render.drawSplitScreen(ctx, players, trapManager, pickupManager, time, matchTime, arenaEventManager);
       }
+      if (state === STATE.INTRO)    drawPregameRules();
       if (state === STATE.PAUSED)   drawPaused();
       if (state === STATE.GAMEOVER) drawGameOver();
     }
@@ -595,6 +617,7 @@
   function drawMenu() {
     ctx.fillStyle = '#244';
     ctx.fillRect(0, 0, C.CANVAS_W, C.CANVAS_H);
+    ctx.textBaseline = 'alphabetic';
 
     // Декоративные тайлы пола внизу
     for (let x = 0; x < C.ARENA_W; x++) {
@@ -603,16 +626,6 @@
     }
 
     const cx = C.CANVAS_W / 2;
-
-    // Превью персонажей
-    ctx.drawImage(G.sprites.janitor.down[0], cx - 144, 140, 96, 96);
-    ctx.drawImage(G.sprites.raccoon.down[0], cx + 58, 150, 77, 77);
-    ctx.font = 'bold 14px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#ffe060';
-    ctx.fillText('ДВОРНИК', cx - 96, 250);
-    ctx.fillStyle = '#a0e0ff';
-    ctx.fillText('ЕНОТ', cx + 96, 250);
 
     // Заголовок
     ctx.fillStyle = '#222';
@@ -626,6 +639,8 @@
     ctx.fillStyle = '#ddd';
     ctx.fillText('Ловушки во дворе. Кто первым потеряет 5 жизней — проиграл.', cx, 108);
 
+    drawMenuChase(cx, 155);
+
     // Опции
     const opts = [
       ['1', '1P vs CPU', '— один игрок против компьютера'],
@@ -633,7 +648,7 @@
       ['3', 'По сети', '— игра с другом через интернет'],
     ];
     for (let i = 0; i < opts.length; i++) {
-      const y = 290 + i * 40;
+      const y = 312 + i * 40;
       const sel = menuChoice === i;
       ctx.fillStyle = sel ? '#fff060' : '#888';
       ctx.font = 'bold 18px monospace';
@@ -648,11 +663,64 @@
     ctx.font = '12px monospace';
     ctx.fillStyle = '#9c9';
     ctx.textAlign = 'center';
-    ctx.fillText('Управление 1: WASD движение, F использовать, Q/E переключить', cx, 470);
+    ctx.fillText('Управление 1: WASD движение, F использовать, Q/E переключить', cx, 486);
     ctx.fillStyle = '#9cc';
-    ctx.fillText('Управление 2: стрелки, «.» использовать, «,» переключить', cx, 488);
+    ctx.fillText('Управление 2: стрелки, «.» использовать, «,» переключить', cx, 504);
     ctx.fillStyle = '#ccc';
-    ctx.fillText('Enter / 1 / 2 / 3 — старт.  Esc — пауза.  M — в меню.', cx, 520);
+    ctx.fillText('Enter / 1 / 2 / 3 — старт.  Esc — пауза.  M — в меню.', cx, 536);
+  }
+
+  function drawMenuChase(cx, y) {
+    const frame = Math.floor(time * 9) % 2;
+    const bob = frame === 0 ? -2 : 2;
+    const phase = (time * 120) % 120;
+    const chasePulse = Math.sin(time * 4.2);
+    const janitorX = cx - 210 + chasePulse * 8;
+    const raccoonX = cx + 70 + chasePulse * 5;
+    const bandX = cx - 330;
+    const bandY = y - 16;
+    const bandW = 660;
+
+    ctx.save();
+    ctx.textBaseline = 'alphabetic';
+
+    ctx.lineCap = 'round';
+    const streaks = [
+      [-290, 18, 48, 2], [-210, 54, 78, 3], [-118, 12, 58, 2],
+      [-58, 78, 92, 3], [22, 34, 118, 4], [118, 68, 72, 3],
+      [202, 20, 90, 3], [286, 88, 44, 2],
+    ];
+    for (let i = 0; i < streaks.length; i++) {
+      const s = streaks[i];
+      const x = bandX + ((s[0] + phase + i * 17 + 360) % (bandW + 140)) - 70;
+      const sy = bandY + s[1];
+      ctx.globalAlpha = 0.42 + (i % 3) * 0.12;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = s[3];
+      ctx.beginPath();
+      ctx.moveTo(x, sy);
+      ctx.lineTo(x + s[2], sy);
+      ctx.stroke();
+    }
+
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(janitorX + 56, y + 92, 54, 9, 0, 0, Math.PI * 2);
+    ctx.ellipse(raccoonX + 43, y + 91, 43, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    ctx.drawImage(G.sprites.janitor.menu_run[frame], janitorX, y + bob, 112, 112);
+    ctx.drawImage(G.sprites.raccoon.menu_run[1 - frame], raccoonX, y + 11 - bob, 86, 86);
+
+    ctx.font = 'bold 13px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffe060';
+    ctx.fillText('ДВОРНИК', janitorX + 56, y + 114);
+    ctx.fillStyle = '#a0e0ff';
+    ctx.fillText('ЕНОТ', raccoonX + 43, y + 114);
+    ctx.restore();
   }
 
   function drawNetSubmenu() {
@@ -777,6 +845,53 @@
     ctx.fillText('Enter — подключиться, Backspace — стереть, Esc — назад', cx, 420);
   }
 
+  function drawPregameRules() {
+    const cx = C.CANVAS_W / 2;
+    const count = Math.max(1, Math.ceil(introT));
+    ctx.fillStyle = 'rgba(0,0,0,0.76)';
+    ctx.fillRect(0, 0, C.CANVAS_W, C.CANVAS_H);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#222';
+    ctx.font = 'bold 36px monospace';
+    ctx.fillText('КРАТКИЕ ПРАВИЛА', cx + 2, 46);
+    ctx.fillStyle = '#fff060';
+    ctx.fillText('КРАТКИЕ ПРАВИЛА', cx, 44);
+
+    ctx.font = 'bold 72px monospace';
+    ctx.fillStyle = '#222';
+    ctx.fillText(String(count), cx + 3, 102);
+    ctx.fillStyle = '#ffe060';
+    ctx.fillText(String(count), cx, 100);
+
+    const lines = [
+      'Цель: первым выбить сопернику все 5 жизней.',
+      'F — использовать выбранный предмет. Q/E или ,/. — переключить предмет.',
+      'Ветка бьёт на 1 клетку перед персонажем и пропадает после попадания.',
+      'Ловушки, банан, петарды и люки помогают догнать или остановить соперника.',
+      'Через 90 секунд наступает ночь: предметы и соперник видны только в луче фонарика.',
+    ];
+
+    ctx.textAlign = 'left';
+    ctx.font = '15px monospace';
+    const left = cx - 350;
+    for (let i = 0; i < lines.length; i++) {
+      const y = 220 + i * 42;
+      ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.04)';
+      ctx.fillRect(left - 14, y - 8, 728, 32);
+      ctx.fillStyle = '#a0e0ff';
+      ctx.fillText('•', left, y);
+      ctx.fillStyle = '#f0f0f0';
+      ctx.fillText(lines[i], left + 28, y);
+    }
+
+    ctx.textAlign = 'center';
+    ctx.font = '13px monospace';
+    ctx.fillStyle = '#9c9';
+    ctx.fillText('Сейчас начнётся матч. M — вернуться в меню.', cx, 488);
+  }
+
   function drawPaused() {
     const cx = C.CANVAS_W / 2;
     // Тёмная подложка
@@ -865,7 +980,7 @@
     ctx.fillStyle = '#ccc';
     ctx.fillText('Получил 5 ударов — проиграл. Активных ловушек одновременно: до 10.', cx, baseY + 40);
     ctx.fillStyle = '#a0e0ff';
-    ctx.fillText('После 120 сек наступает ночь на 60 сек: динамика видна только в луче фонарика.', cx, baseY + 62);
+    ctx.fillText('После 90 сек наступает ночь на 60 сек: динамика видна только в луче фонарика.', cx, baseY + 62);
     ctx.fillStyle = '#ffe060';
     ctx.fillText('Алмаз дворника и пицца енота притягивают соперника через всю карту.', cx, baseY + 84);
   }
