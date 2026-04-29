@@ -1276,6 +1276,22 @@
     return rowsToStrs(r);
   }
 
+  function makeCan() {
+    const r = blank(48, 48);
+    fillRect(r, 15, 12, 18, 24, 'c');
+    fillRect(r, 16, 10, 16, 3, 'h');
+    fillRect(r, 16, 35, 16, 3, 'd');
+    fillRect(r, 14, 14, 2, 20, 'd');
+    fillRect(r, 32, 14, 2, 20, 's');
+    fillRect(r, 18, 16, 10, 2, 'h');
+    fillRect(r, 20, 22, 8, 2, 'l');
+    fillRect(r, 20, 27, 8, 2, 'l');
+    fillRect(r, 27, 17, 3, 14, 's');
+    fillRect(r, 18, 11, 12, 1, 'w');
+    fillRect(r, 18, 36, 12, 1, 'w');
+    return rowsToStrs(r);
+  }
+
 
   function makeTrapdoor() {
     const r = blank(48, 48);
@@ -1344,6 +1360,9 @@
   const branchPalette = {
     w: '#8a4d20', h: '#d7a15a', l: '#4ea64a',
   };
+  const canPalette = {
+    c: '#76b7d6', h: '#d8f3ff', d: '#2d6f8f', s: '#1f4d68', l: '#f06050', w: '#ffffff',
+  };
 
   const fallbackTrapSprites = {
     mousetrap:   makeBitmap(makeMousetrap(),   mousetrapPalette),
@@ -1351,6 +1370,7 @@
     trapdoor:    makeBitmap(makeTrapdoor(),    trapdoorPalette),
     banana:      makeBitmap(makeBanana(),      bananaPalette),
     branch:      makeBitmap(makeBranch(),      branchPalette),
+    can:         makeBitmap(makeCan(),         canPalette),
   };
 
   G.sprites.traps = {
@@ -1359,6 +1379,7 @@
     trapdoor:    loadPngSprite('./assets/traps/trapdoor.png',    fallbackTrapSprites.trapdoor),
     banana:      loadPngSprite('./assets/traps/banana.png',      fallbackTrapSprites.banana),
     branch:      fallbackTrapSprites.branch,
+    can:         fallbackTrapSprites.can,
   };
 
   // --- Power-ups 48×48 ---

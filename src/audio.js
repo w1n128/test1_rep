@@ -264,6 +264,22 @@
         tone(430, 0.05, 'triangle', 0.08, 0.04, 320);
         noise(0.05, 0.05, 1200, 0.02);
         break;
+      case 'pickup_can':
+        tone(820, 0.035, 'square', 0.10);
+        tone(1260, 0.045, 'square', 0.08, 0.035, 900);
+        filteredNoise(0.035, 0.05, 4200, 0.02, 'sfx', 'bandpass', 3.0);
+        break;
+      case 'dash':
+        if (!canPlay('dash', 120)) return;
+        filteredNoise(0.12, 0.14, 2600, 0, 'sfx', 'highpass', 0.8);
+        tone(520, 0.08, 'sine', 0.08, 0, 980);
+        break;
+      case 'last_chance':
+        if (!canPlay('last_chance', 400)) return;
+        tone(880, 0.08, 'square', 0.12);
+        tone(1174, 0.10, 'square', 0.12, 0.08);
+        tone(1568, 0.16, 'triangle', 0.10, 0.18);
+        break;
       case 'place':
         tone(220, 0.08, 'square', 0.12);
         noise(0.05, 0.04, 600);
@@ -272,6 +288,21 @@
         if (!canPlay('throw', 200)) return;
         noise(0.18, 0.1, 2200);
         tone(700, 0.1, 'sine', 0.05, 0, 1200);
+        break;
+      case 'throw_can':
+        if (!canPlay('throw_can', 150)) return;
+        filteredNoise(0.10, 0.08, 3600, 0, 'sfx', 'highpass', 0.9);
+        tone(960, 0.07, 'triangle', 0.08, 0, 1600);
+        break;
+      case 'can_hit':
+        if (!canPlay('can_hit', 150)) return;
+        filteredNoise(0.045, 0.20, 5200, 0, 'sfx', 'bandpass', 4.0);
+        tone(1800, 0.035, 'square', 0.08, 0.005, 700);
+        break;
+      case 'can_clank':
+        if (!canPlay('can_clank', 120)) return;
+        tone(1400, 0.08, 'square', 0.09, 0, 760);
+        tone(2200, 0.05, 'triangle', 0.06, 0.04, 1200);
         break;
       case 'fall':
         // Падение в люк — нисходящее «уиу»

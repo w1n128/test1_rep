@@ -429,11 +429,12 @@
           up: local.isDown('up'), down: local.isDown('down'),
           left: local.isDown('left'), right: local.isDown('right'),
           place: local.isDown('place'),
+          dash: local.isDown('dash'),
           switchNext: local.isDown('switchNext'),
           switchPrev: local.isDown('switchPrev'),
         };
         const justPressed = [];
-        for (const a of ['place', 'switchNext', 'switchPrev']) {
+        for (const a of ['place', 'dash', 'switchNext', 'switchPrev']) {
           if (local.wasPressed(a)) justPressed.push(a);
         }
         G.net.send({ t: 'input', actions, justPressed });
@@ -867,8 +868,8 @@
 
     const lines = [
       'Цель: первым выбить сопернику все 5 жизней.',
-      'F — использовать выбранный предмет. Q/E или ,/. — переключить предмет.',
-      'Ветка бьёт на 1 клетку перед персонажем и пропадает после попадания.',
+      'F — использовать предмет. Shift — рывок с перезарядкой.',
+      'Ветка бьёт на 1 клетку, банка летит по направлению взгляда.',
       'Ловушки, банан, петарды и люки помогают догнать или остановить соперника.',
       'Через 90 секунд наступает ночь: предметы и соперник видны только в луче фонарика.',
     ];
@@ -941,12 +942,17 @@
       {
         type: 'branch',
         name: 'Ветка',
-        desc: 'Используйте F: одноразовый удар на 1 клетку перед собой, урон 1.',
+        desc: 'F: одноразовый удар на 1 клетку, урон 1 + микростан.',
+      },
+      {
+        type: 'can',
+        name: 'Банка',
+        desc: 'F: бросок по направлению взгляда на 5 клеток, урон 1 + короткая остановка.',
       },
     ];
 
     const startY = 138;
-    const rowH = 56;
+    const rowH = 48;
     const iconSize = 40;
     const leftX = cx - 320;
     for (let i = 0; i < rules.length; i++) {
@@ -974,15 +980,15 @@
     ctx.font = '12px monospace';
     ctx.fillStyle = '#9c9';
     const baseY = startY + rules.length * rowH + 14;
-    ctx.fillText('Управление 1 (Дворник): WASD движение, F использовать, Q/E переключить', cx, baseY);
+    ctx.fillText('Управление 1 (Дворник): WASD движение, Shift рывок, F использовать, Q/E переключить', cx, baseY);
     ctx.fillStyle = '#9cc';
-    ctx.fillText('Управление 2 (Енот): стрелки, «.» использовать, «,» переключить', cx, baseY + 18);
+    ctx.fillText('Управление 2 (Енот): стрелки, Right Shift или / рывок, «.» использовать, «,» переключить', cx, baseY + 18);
     ctx.fillStyle = '#ccc';
     ctx.fillText('Получил 5 ударов — проиграл. Активных ловушек одновременно: до 10.', cx, baseY + 40);
     ctx.fillStyle = '#a0e0ff';
     ctx.fillText('После 90 сек наступает ночь на 60 сек: динамика видна только в луче фонарика.', cx, baseY + 62);
     ctx.fillStyle = '#ffe060';
-    ctx.fillText('Алмаз дворника и пицца енота притягивают соперника через всю карту.', cx, baseY + 84);
+    ctx.fillText('При 1 HP включается последний шанс: рывок сразу готов и скорость чуть выше.', cx, baseY + 84);
   }
 
   function drawOverlay(title, sub) {

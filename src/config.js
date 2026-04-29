@@ -30,8 +30,9 @@
 
     TRAP_TYPES: ['mousetrap', 'firecracker', 'trapdoor', 'banana'],
     COMBAT_TYPES: ['branch'],
-    get PICKUP_TYPES() { return this.TRAP_TYPES.concat(this.COMBAT_TYPES); },
-    get ITEM_TYPES() { return this.TRAP_TYPES.concat(this.COMBAT_TYPES, this.BAIT_TYPES); },
+    THROWABLE_TYPES: ['can'],
+    get PICKUP_TYPES() { return this.TRAP_TYPES.concat(this.COMBAT_TYPES, this.THROWABLE_TYPES); },
+    get ITEM_TYPES() { return this.TRAP_TYPES.concat(this.COMBAT_TYPES, this.THROWABLE_TYPES, this.BAIT_TYPES); },
     POWERUP_TYPES: ['star', 'broom', 'boombox'],
     POWERUP_WEIGHTS: { star: 1, broom: 2, boombox: 2 },
     BAIT_TYPES: ['pizza', 'diamond'],
@@ -39,6 +40,14 @@
     BAIT_PULL_DURATION: 2.8,
     BAIT_PULL_STRENGTH: 2.4,
     MELEE_EFFECT_TIME: 0.22,
+    MELEE_STUN_TIME: 0.3,
+    PROJECTILE_STUN_TIME: 0.25,
+    PROJECTILE_RANGE_TILES: 5,
+    PROJECTILE_SPEED: 620,
+    DASH_TIME: 0.16,
+    DASH_COOLDOWN: 2.0,
+    DASH_SPEED: 720,
+    LAST_CHANCE_SPEED_MUL: 1.15,
     PREGAME_RULES_DURATION: 5.0,    // экран кратких правил перед стартом
     NIGHT_DAY_DURATION: 90.0,       // сколько длится день перед ночью
     NIGHT_DURATION: 60.0,           // длительность ночи

@@ -223,6 +223,19 @@
         ctx.fillRect(Math.round(eff.x - 5), Math.round(eff.y - 5 - k * 8), 3, 6);
         ctx.fillRect(Math.round(eff.x + 3), Math.round(eff.y - 8 - k * 8), 3, 6);
         ctx.restore();
+      } else if (eff.kind === 'can_clank') {
+        if (!isLitPx(litTiles, eff.x, eff.y)) continue;
+        const k = eff.t / eff.lifetime;
+        ctx.save();
+        ctx.globalAlpha = 1 - k;
+        ctx.strokeStyle = '#d8f3ff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(eff.x, eff.y, 6 + k * 18, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(Math.round(eff.x - 2), Math.round(eff.y - 12 - k * 8), 4, 3);
+        ctx.restore();
       } else if (eff.kind === 'melee_swing') {
         if (!isLitPx(litTiles, eff.x, eff.y)) continue;
         const k = eff.t / eff.lifetime;
@@ -237,6 +250,44 @@
         ctx.restore();
       }
     }
+  }
+
+  function drawProjectiles(ctx, projectiles, litTiles) {
+    if (!projectiles) return;
+    for (const pr of projectiles) {
+      if (!isLitPx(litTiles, pr.x, pr.y)) continue;
+      const sprite = G.sprites.traps[pr.type];
+      if (!sprite) continue;
+      const size = pr.type === 'can' ? 18 : 16;
+      ctx.save();
+      ctx.translate(pr.x, pr.y);
+      ctx.rotate(pr.spin || 0);
+      ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
+      ctx.restore();
+    }
+  }
+
+  function drawArenaEventObjects(ctx, arenaEvents, litTiles) {
+    if (!arenaEvents || !arenaEvents.active || arenaEvents.active.type !== 'cart') return;
+    const a = arenaEvents.active;
+    const horizontal = a.dir === 'left' || a.dir === 'right';
+    const x = horizontal ? a.pos : a.lane * C.TILE + C.TILE / 2;
+    const y = horizontal ? a.lane * C.TILE + C.TILE / 2 : a.pos;
+    if (!isLitPx(litTiles, x, y)) return;
+    ctx.save();
+    ctx.translate(x, y);
+    if (!horizontal) ctx.rotate(Math.PI / 2);
+    if (a.dir === 'left' || a.dir === 'up') ctx.scale(-1, 1);
+    ctx.drawImage(G.tiles.bin, -C.TILE / 2, -C.TILE / 2, C.TILE, C.TILE);
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-34, -14);
+    ctx.lineTo(-54, -14);
+    ctx.moveTo(-30, 4);
+    ctx.lineTo(-48, 4);
+    ctx.stroke();
+    ctx.restore();
   }
 
   function drawPulls(ctx, pulls, litTiles) {
@@ -352,6 +403,38 @@
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = 'source-over';
     }
+
+    if (p.emotionT > 0) {
+      const k = p.emotionT;
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = 'bold 12px monospace';
+      const label = p.emotion === 'panic' ? '!' : p.emotion === 'dash' ? '»' : p.emotion === 'dizzy' ? '✦' : 'АУЧ';
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(Math.round(p.x - 18), Math.round(drawY - 16), 36, 14);
+      ctx.fillStyle = p.emotion === 'panic' ? '#ff8060' : p.emotion === 'dash' ? '#a0e0ff' : '#fff060';
+      ctx.fillText(label, p.x, drawY - 9 - Math.sin(k * 20) * 2);
+      ctx.restore();
+    }
+  }
+
+  function drawAimLine(ctx, p, viewer, litTiles) {
+    if (p.id !== viewer.id || !p.alive || !p.selectedType || p.selectedType() !== 'can' || p.inventory.can <= 0) return;
+    const d = dirVec(p.dir);
+    const len = C.PROJECTILE_RANGE_TILES * C.TILE;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(160,224,255,0.55)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - 4);
+    ctx.lineTo(p.x + d.x * len, p.y - 4 + d.y * len);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(160,224,255,0.8)';
+    ctx.fillRect(Math.round(p.x + d.x * len - 2), Math.round(p.y - 4 + d.y * len - 2), 4, 4);
+    ctx.restore();
   }
 
   function drawNightOverlay(ctx, litTiles) {
@@ -378,7 +461,7 @@
     ctx.restore();
   }
 
-  function drawViewport(ctx, viewer, players, traps, pickups, x, y, w, h, time, night) {
+  function drawViewport(ctx, viewer, players, traps, pickups, x, y, w, h, time, night, arenaEvents = null) {
     const camX = clamp(viewer.x - w / 2, 0, Math.max(0, C.ARENA_PX_W - w));
     const camY = clamp(viewer.y - h / 2, 0, Math.max(0, C.ARENA_PX_H - h));
     const litTiles = night.active ? buildLightTiles(viewer) : null;
@@ -396,11 +479,14 @@
     ctx.drawImage(worldCanvas, 0, 0);
 
     // Динамика
+    drawArenaEventObjects(ctx, arenaEvents, litTiles);
     drawPickups(ctx, pickups, time, litTiles);
     drawTraps(ctx, traps, viewer.id, time, litTiles);
     drawEffects(ctx, traps.effects, litTiles);
+    drawProjectiles(ctx, traps.projectiles, litTiles);
     drawPulls(ctx, traps.pulls, litTiles);
     if (G.particles) G.particles.draw(ctx, litTiles ? ((px, py) => isLitPx(litTiles, px, py)) : null);
+    for (const p of players) drawAimLine(ctx, p, viewer, litTiles);
     for (const p of players) drawPlayer(ctx, p, viewer, time, litTiles);
     if (night.active) {
       ctx.filter = 'none';
@@ -458,8 +544,8 @@
     ctx.fillStyle = G.PALETTE.splitBar;
     ctx.fillRect(0, vh, C_.CANVAS_W, gap);
 
-    drawViewport(ctx, players[0], players, traps, pickups, 0, 0, vw, vh, time, night);
-    drawViewport(ctx, players[1], players, traps, pickups, 0, vh + gap, vw, vh, time, night);
+    drawViewport(ctx, players[0], players, traps, pickups, 0, 0, vw, vh, time, night, arenaEvents);
+    drawViewport(ctx, players[1], players, traps, pickups, 0, vh + gap, vw, vh, time, night, arenaEvents);
 
     if (sx || sy) ctx.restore();
 
@@ -481,7 +567,7 @@
       ctx.translate(Math.round(sx), Math.round(sy));
     }
 
-    drawViewport(ctx, viewer, players, traps, pickups, 0, 0, C_.CANVAS_W, C_.CANVAS_H, time, night);
+    drawViewport(ctx, viewer, players, traps, pickups, 0, 0, C_.CANVAS_W, C_.CANVAS_H, time, night, arenaEvents);
 
     if (sx || sy) ctx.restore();
 

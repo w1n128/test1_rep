@@ -24,8 +24,15 @@
       this.stepT = 0;
       this.throwT = 0;
       this.attackT = 0;
+      this.stunT = 0;
+      this.dashT = 0;
+      this.dashCD = 0;
+      this.dashDir = { dx: 0, dy: 0 };
+      this.emotionT = 0;
+      this.emotion = '';
+      this.lastChanceUsed = false;
       this.slideT = 0;
-      this.inventory = { mousetrap: 0, firecracker: 0, trapdoor: 0, banana: 0, branch: 0, pizza: 0, diamond: 0 };
+      this.inventory = { mousetrap: 0, firecracker: 0, trapdoor: 0, banana: 0, branch: 0, can: 0, pizza: 0, diamond: 0 };
       this.selectedTrap = 0;
       // Power-up состояния
       this.starT = 0;           // звезда: бессмертие + 2x скорость
@@ -39,6 +46,7 @@
       this.inventory.trapdoor = 1;
       this.inventory.banana = 1;
       this.inventory.branch = 1;
+      this.inventory.can = 1;
       if (this.character === 'janitor') this.inventory.diamond = 1;
       if (this.character === 'raccoon') this.inventory.pizza = 1;
     }
@@ -48,7 +56,7 @@
 
     itemTypes() {
       const bait = this.character === 'janitor' ? 'diamond' : 'pizza';
-      return C.TRAP_TYPES.concat(C.COMBAT_TYPES, [bait]);
+      return C.TRAP_TYPES.concat(C.COMBAT_TYPES, C.THROWABLE_TYPES, [bait]);
     }
 
     selectedType() {
@@ -75,13 +83,38 @@
       this.hp = Math.max(0, this.hp - amount);
       this.invincibility = C.INVINCIBILITY_AFTER_HIT;
       this.sliding = null;
-      if (window.G && window.G.audio) {
-        window.G.audio.play(this.character === 'raccoon' ? 'hurt_raccoon' : 'hurt_janitor');
+      this.emote('hurt', 0.42);
+      if (window.G) {
+        const sound = this.character === 'raccoon' ? 'hurt_raccoon' : 'hurt_janitor';
+        if (window.G.fx && window.G.fx.audio) window.G.fx.audio(sound);
+        else if (window.G.audio) window.G.audio.play(sound);
+      }
+      if (this.hp === 1 && !this.lastChanceUsed) {
+        this.lastChanceUsed = true;
+        this.dashCD = 0;
+        this.emote('panic', 1.0);
+        if (window.G && window.G.fx) {
+          window.G.fx.audio('last_chance');
+          window.G.fx.particles('burstStars', this.x, this.y - 16);
+        }
       }
       if (this.hp <= 0) {
         this.alive = false;
       }
       return true;
+    }
+
+    emote(name, duration = 0.45) {
+      this.emotion = name;
+      this.emotionT = Math.max(this.emotionT, duration);
+    }
+
+    stun(duration) {
+      if (this.fallen > 0 || !this.alive) return;
+      this.stunT = Math.max(this.stunT, duration);
+      this.sliding = null;
+      this.dashT = 0;
+      this.moving = false;
     }
 
     heal(amount) {
@@ -126,6 +159,8 @@
       if (!this.alive) return;
       if (this.invincibility > 0) this.invincibility -= dt;
       if (this.attackT > 0) this.attackT = Math.max(0, this.attackT - dt);
+      if (this.dashCD > 0) this.dashCD = Math.max(0, this.dashCD - dt);
+      if (this.emotionT > 0) this.emotionT = Math.max(0, this.emotionT - dt);
 
       // === Power-up таймеры ===
       if (this.starT > 0) {
@@ -133,6 +168,14 @@
         this.starTouchT = Math.max(0, this.starTouchT - dt);
       }
       if (this.hiddenT > 0) this.hiddenT = Math.max(0, this.hiddenT - dt);
+
+      if (this.stunT > 0) {
+        this.stunT = Math.max(0, this.stunT - dt);
+        this.moving = false;
+        this.walkT += dt * 8;
+        this.input.consume && this.input.consume();
+        return;
+      }
 
       // === Танец под магнитофон: блокирует движение, лечит ===
       if (this.dancing) {
@@ -190,6 +233,23 @@
         return;
       }
 
+      if (this.dashT > 0) {
+        const stepX = this.dashDir.dx * C.DASH_SPEED * dt;
+        const stepY = this.dashDir.dy * C.DASH_SPEED * dt;
+        let moved = false;
+        if (stepX !== 0) moved = this.tryMove(stepX, 0) || moved;
+        if (stepY !== 0) moved = this.tryMove(0, stepY) || moved;
+        this.dashT = Math.max(0, this.dashT - dt);
+        if (!moved) this.dashT = 0;
+        this.dir = dirFromVec(this.dashDir.dx, this.dashDir.dy) || this.dir;
+        this.moving = true;
+        this.walkT += dt * 2.4;
+        if (window.G && window.G.particles && Math.random() < 0.45) window.G.particles.spawnDust(this.x, this.y + 12);
+        triggerTrapsAt(this, traps);
+        this.input.consume && this.input.consume();
+        return;
+      }
+
       // Тики анимаций «бросок»
       if (this.throwT > 0) this.throwT = Math.max(0, this.throwT - dt);
 
@@ -214,8 +274,29 @@
         const inv = 1 / Math.SQRT2;
         dx *= inv; dy *= inv;
       }
+
+      if (this.input.wasPressed && this.input.wasPressed('dash') && this.dashCD <= 0) {
+        let dashDx = dx, dashDy = dy;
+        if (dashDx === 0 && dashDy === 0) {
+          const d = vecFromDir(this.dir);
+          dashDx = d.x; dashDy = d.y;
+        }
+        if (dashDx !== 0 || dashDy !== 0) {
+          const len = Math.hypot(dashDx, dashDy) || 1;
+          this.dashDir = { dx: dashDx / len, dy: dashDy / len };
+          this.dashT = C.DASH_TIME;
+          this.dashCD = C.DASH_COOLDOWN;
+          this.emote('dash', 0.22);
+          if (window.G && window.G.fx) window.G.fx.audio('dash');
+          if (window.G && window.G.particles) window.G.particles.spawnDustCloud(this.x, this.y + 10);
+          this.input.consume && this.input.consume();
+          return;
+        }
+      }
+
       const eventMul = window.G && window.G.arenaEvents && window.G.arenaEvents.speedMul ? window.G.arenaEvents.speedMul() : 1;
-      const speed = C.PLAYER_SPEED * eventMul * (this.starT > 0 ? C.STAR_SPEED_MUL : 1);
+      const lastChanceMul = this.hp === 1 ? C.LAST_CHANCE_SPEED_MUL : 1;
+      const speed = C.PLAYER_SPEED * eventMul * lastChanceMul * (this.starT > 0 ? C.STAR_SPEED_MUL : 1);
       const moved = this.tryMove(dx * speed * dt, 0) | this.tryMove(0, dy * speed * dt);
       this.moving = (dx !== 0 || dy !== 0);
       if (this.moving) {
@@ -289,6 +370,13 @@
         hiddenT: this.hiddenT,
         dancing: this.dancing,
         danceHealT: this.danceHealT,
+        stunT: this.stunT,
+        dashT: this.dashT,
+        dashCD: this.dashCD,
+        dashDir: this.dashDir,
+        emotionT: this.emotionT,
+        emotion: this.emotion,
+        lastChanceUsed: this.lastChanceUsed,
       };
     }
     applySnapshot(s) {
@@ -310,6 +398,13 @@
       this.hiddenT = s.hiddenT || 0;
       this.dancing = !!s.dancing;
       this.danceHealT = s.danceHealT || 0;
+      this.stunT = s.stunT || 0;
+      this.dashT = s.dashT || 0;
+      this.dashCD = s.dashCD || 0;
+      this.dashDir = s.dashDir || { dx: 0, dy: 0 };
+      this.emotionT = s.emotionT || 0;
+      this.emotion = s.emotion || '';
+      this.lastChanceUsed = !!s.lastChanceUsed;
     }
   }
 
@@ -329,6 +424,13 @@
     const tx = player.tileX;
     const ty = player.tileY;
     traps.triggerForPlayer(player, tx, ty);
+  }
+
+  function vecFromDir(dir) {
+    if (dir === 'left') return { x: -1, y: 0 };
+    if (dir === 'right') return { x: 1, y: 0 };
+    if (dir === 'up') return { x: 0, y: -1 };
+    return { x: 0, y: 1 };
   }
 
   G.Player = Player;

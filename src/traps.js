@@ -45,6 +45,7 @@
       this.list = [];
       this.effects = [];
       this.pulls = [];
+      this.projectiles = [];
       this.players = null;
     }
     setPlayers(players) { this.players = players; }
@@ -126,6 +127,7 @@
       const type = player.selectedType();
       if (player.inventory[type] <= 0) return false;
       if (C.COMBAT_TYPES.indexOf(type) >= 0) return this.tryMelee(player);
+      if (C.THROWABLE_TYPES.indexOf(type) >= 0) return this.throwProjectile(player, type);
       if (C.BAIT_TYPES.indexOf(type) >= 0) return this.useBait(player, type);
       if (this.countByOwner(player.id) >= C.TRAP_LIMIT_PER_PLAYER) return false;
 
@@ -172,6 +174,28 @@
       return true;
     }
 
+    throwProjectile(player, type) {
+      if (player.inventory[type] <= 0) return false;
+      const d = dirVec(player.dir);
+      if (d.x === 0 && d.y === 0) return false;
+      player.inventory[type] -= 1;
+      player.throwT = C.THROW_ANIM_TIME;
+      const range = C.PROJECTILE_RANGE_TILES * C.TILE;
+      this.projectiles.push({
+        type,
+        ownerId: player.id,
+        x: player.x,
+        y: player.y - 4,
+        dx: d.x,
+        dy: d.y,
+        traveled: 0,
+        range,
+        spin: 0,
+      });
+      if (G.fx) G.fx.audio('throw_can');
+      return true;
+    }
+
     playerInFrontOf(player) {
       if (!this.players) return null;
       const d = dirVec(player.dir);
@@ -202,6 +226,8 @@
       if (type === 'branch') {
         if (target.damage(1)) {
           player.inventory.branch = 0;
+          target.stun(C.MELEE_STUN_TIME);
+          target.emote('dizzy', 0.5);
           if (G.fx) {
             G.fx.audio(target.character === 'raccoon' ? 'melee_hit_raccoon' : 'melee_hit_janitor');
             G.fx.shake(4, 0.14);
@@ -216,10 +242,53 @@
     update(dt) {
       for (const t of this.list) t.update(dt, this);
       this.list = this.list.filter((t) => !t.destroyed);
+      this.updateProjectiles(dt);
       for (const p of this.pulls) p.t += dt;
       this.pulls = this.pulls.filter((p) => p.t < p.lifetime);
       for (const eff of this.effects) eff.t += dt;
       this.effects = this.effects.filter((eff) => eff.t < eff.lifetime);
+    }
+
+    updateProjectiles(dt) {
+      for (const pr of this.projectiles) {
+        if (pr.destroyed) continue;
+        const step = C.PROJECTILE_SPEED * dt;
+        pr.x += pr.dx * step;
+        pr.y += pr.dy * step;
+        pr.traveled += step;
+        pr.spin += dt * 18;
+        const tx = Math.floor(pr.x / C.TILE);
+        const ty = Math.floor(pr.y / C.TILE);
+        if (pr.traveled >= pr.range || G.arena.isSolidTile(tx, ty)) {
+          pr.destroyed = true;
+          this.effects.push({ kind: 'can_clank', x: pr.x, y: pr.y, t: 0, lifetime: 0.32 });
+          if (G.fx) G.fx.audio('can_clank');
+          continue;
+        }
+        if (!this.players) continue;
+        for (const p of this.players) {
+          if (!p.alive || p.id === pr.ownerId || p.fallen > 0) continue;
+          const dx = p.x - pr.x;
+          const dy = p.y - pr.y;
+          if (dx * dx + dy * dy <= 18 * 18) {
+            pr.destroyed = true;
+            if (p.damage(1)) {
+              p.stun(C.PROJECTILE_STUN_TIME);
+              p.emote('dizzy', 0.5);
+              if (G.fx) {
+                G.fx.audio('can_hit');
+                G.fx.shake(3, 0.10);
+                G.fx.particles('burstStars', p.x, p.y - 14);
+              }
+              this.effects.push({ kind: 'bonk', x: p.x, y: p.y - 18, t: 0, lifetime: 0.55 });
+            } else if (G.fx) {
+              G.fx.audio('can_clank');
+            }
+            break;
+          }
+        }
+      }
+      this.projectiles = this.projectiles.filter((p) => !p.destroyed);
     }
 
     triggerForPlayer(player, tx, ty) {
@@ -305,6 +374,7 @@
           life: t.life,
         })),
         pulls: this.pulls.map(p => ({ ...p })),
+        projectiles: this.projectiles.map(p => ({ ...p })),
       };
     }
     applySnapshot(s) {
@@ -317,6 +387,7 @@
         return t;
       });
       this.pulls = (s.pulls || []).map(p => ({ ...p }));
+      this.projectiles = (s.projectiles || []).map(p => ({ ...p }));
     }
 
     detonateFirecracker(trap) {

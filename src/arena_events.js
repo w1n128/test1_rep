@@ -1,4 +1,4 @@
-// Случайные события двора: ветер, мусорный дождь и сирена.
+// Случайные события двора: ветер, мусорный дождь и катящийся бак.
 (function () {
   const G = window.G;
   const C = G.config;
@@ -6,6 +6,7 @@
   const EVENT_NAMES = {
     wind: 'ВЕТЕР',
     trash: 'МУСОРНЫЙ ДОЖДЬ',
+    cart: 'КАТИТСЯ БАК',
   };
 
   function randNext() {
@@ -38,14 +39,22 @@
     }
 
     start(type, players, traps, pickups) {
+      const horizontal = Math.random() < 0.5;
+      const dir = horizontal
+        ? (Math.random() < 0.5 ? 'left' : 'right')
+        : (Math.random() < 0.5 ? 'up' : 'down');
       this.active = {
         type,
         t: 0,
         duration: C.ARENA_EVENT_DURATION,
-        dir: ['left', 'right', 'up', 'down'][Math.floor(Math.random() * 4)],
+        dir,
+        lane: horizontal
+          ? 1 + Math.floor(Math.random() * (C.ARENA_H - 2))
+          : 1 + Math.floor(Math.random() * (C.ARENA_W - 2)),
+        pos: dir === 'right' || dir === 'down' ? -C.TILE : (horizontal ? C.ARENA_PX_W + C.TILE : C.ARENA_PX_H + C.TILE),
       };
       this.bannerT = 2.2;
-      if (G.fx) G.fx.audio(type === 'trash' ? 'event_trash' : 'event_wind');
+      if (G.fx) G.fx.audio(type === 'trash' ? 'event_trash' : type === 'cart' ? 'can_clank' : 'event_wind');
       if (type === 'wind') this.pushLooseStuff(players, traps, pickups);
       if (type === 'trash') this.spawnTrash(players, traps, pickups);
     }
@@ -113,6 +122,7 @@
       if (this.bannerT > 0) this.bannerT = Math.max(0, this.bannerT - dt);
       if (this.active) {
         this.active.t += dt;
+        if (this.active.type === 'cart') this.updateCart(dt, players);
         if (this.active.t >= this.active.duration) {
           this.active = null;
           this.nextEvent = randNext();
@@ -121,8 +131,34 @@
       }
       this.nextEvent -= dt;
       if (this.nextEvent <= 0) {
-        const type = ['wind', 'trash'][Math.floor(Math.random() * 2)];
+        const type = ['wind', 'trash', 'cart'][Math.floor(Math.random() * 3)];
         this.start(type, players, traps, pickups);
+      }
+    }
+
+    updateCart(dt, players) {
+      const a = this.active;
+      const d = dirVec(a.dir);
+      a.pos += (d.x !== 0 ? d.x : d.y) * 260 * dt;
+      const horizontal = a.dir === 'left' || a.dir === 'right';
+      const x = horizontal ? a.pos : a.lane * C.TILE + C.TILE / 2;
+      const y = horizontal ? a.lane * C.TILE + C.TILE / 2 : a.pos;
+      if (G.particles && Math.random() < 0.45) G.particles.spawnDust(x, y + 16);
+      for (const p of players || []) {
+        if (!p.alive || p.fallen > 0) continue;
+        const dx = p.x - x;
+        const dy = p.y - y;
+        if (dx * dx + dy * dy < 26 * 26) {
+          if (p.damage(1)) {
+            p.stun(0.45);
+            p.emote('dizzy', 0.7);
+            if (G.fx) {
+              G.fx.audio('can_hit');
+              G.fx.shake(5, 0.18);
+              G.fx.particles('burstStars', p.x, p.y - 14);
+            }
+          }
+        }
       }
     }
 

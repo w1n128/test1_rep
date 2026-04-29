@@ -102,6 +102,23 @@
       return null;
     }
 
+    canThrowAtOpponent() {
+      if (!this.opponent || !this.opponent.alive || this.player.inventory.can <= 0) return null;
+      const dx = this.opponent.tileX - this.player.tileX;
+      const dy = this.opponent.tileY - this.player.tileY;
+      if (dx !== 0 && dy !== 0) return null;
+      const dist = Math.abs(dx) + Math.abs(dy);
+      if (dist < 2 || dist > C.PROJECTILE_RANGE_TILES) return null;
+      const sx = Math.sign(dx);
+      const sy = Math.sign(dy);
+      for (let i = 1; i <= dist; i++) {
+        const tx = this.player.tileX + sx * i;
+        const ty = this.player.tileY + sy * i;
+        if (G.arena.isSolidTile(tx, ty)) return null;
+      }
+      return sx > 0 ? 'right' : sx < 0 ? 'left' : sy > 0 ? 'down' : 'up';
+    }
+
     decide() {
       const px = this.player.tileX, py = this.player.tileY;
 
@@ -178,6 +195,20 @@
       this.baitCD = Math.max(0, this.baitCD - dt);
 
       if (this.opponent && this.opponent.alive) {
+        const throwDir = this.canThrowAtOpponent();
+        if (throwDir && this.placeCD <= 0) {
+          this._actions[throwDir] = true;
+          if (this.player.selectedType() !== 'can') {
+            if (this.switchCD === 0) {
+              this._justPressed.switchNext = true;
+              this.switchCD = 0.18;
+            }
+          } else {
+            this._justPressed.place = true;
+            this.placeCD = 0.7;
+          }
+          return;
+        }
         const dx = this.opponent.tileX - this.player.tileX;
         const dy = this.opponent.tileY - this.player.tileY;
         if (Math.abs(dx) + Math.abs(dy) === 1) {
@@ -250,6 +281,15 @@
         } else {
           this._actions[dy > 0 ? 'down' : 'up'] = true;
           if (Math.abs(dx) > 6) this._actions[dx > 0 ? 'right' : 'left'] = true;
+        }
+        if (
+          this.player.dashCD <= 0 &&
+          this.opponent &&
+          this.opponent.alive &&
+          Math.abs(this.opponent.tileX - this.player.tileX) + Math.abs(this.opponent.tileY - this.player.tileY) >= 5 &&
+          Math.random() < 0.025
+        ) {
+          this._justPressed.dash = true;
         }
       }
     }
