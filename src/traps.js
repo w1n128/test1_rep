@@ -191,17 +191,11 @@
       if (C.COMBAT_TYPES.indexOf(type) < 0) return false;
       if (player.inventory[type] <= 0) return false;
 
-      const d = dirVec(player.dir);
-      const tx = player.tileX + d.x;
-      const ty = player.tileY + d.y;
-      const cx = tx * C.TILE + C.TILE / 2;
-      const cy = ty * C.TILE + C.TILE / 2;
       const target = this.playerInFrontOf(player);
       player.attackT = C.MELEE_EFFECT_TIME;
 
       if (G.fx) {
         G.fx.audio('melee_swing');
-        this.effects.push({ kind: 'melee_swing', x: cx, y: cy, dir: player.dir, t: 0, lifetime: C.MELEE_EFFECT_TIME });
       }
       if (!target) return false;
 

@@ -463,6 +463,33 @@
       // Весёлый открытый рот во время танца.
       fillRect(r, 22, 20, 4, 2, 'S');
       fillRect(r, 23, 21, 2, 1, 'M');
+    } else if (pose === 'melee') {
+      fillRect(r, 7, 27, 3, 7, 'j');
+      if (dir === 'left') {
+        fillRect(r, 0, 25, 10, 3, 'j');
+        fillRect(r, 0, 25, 3, 2, 's');
+        fillRect(r, 0, 22, 15, 3, 'x');
+        fillRect(r, 0, 21, 4, 1, 'y');
+        fillRect(r, 11, 20, 4, 2, 'z');
+      } else if (dir === 'up') {
+        fillRect(r, 35, 11, 4, 15, 'j');
+        fillRect(r, 35, 9, 4, 2, 's');
+        fillRect(r, 37, 0, 3, 14, 'x');
+        fillRect(r, 36, 0, 1, 5, 'y');
+        fillRect(r, 39, 1, 3, 3, 'z');
+      } else if (dir === 'down') {
+        fillRect(r, 36, 24, 4, 15, 'j');
+        fillRect(r, 36, 38, 4, 2, 's');
+        fillRect(r, 38, 34, 3, 14, 'x');
+        fillRect(r, 37, 43, 1, 5, 'y');
+        fillRect(r, 40, 41, 4, 3, 'z');
+      } else {
+        fillRect(r, 38, 25, 10, 3, 'j');
+        fillRect(r, 45, 25, 3, 2, 's');
+        fillRect(r, 33, 22, 15, 3, 'x');
+        fillRect(r, 44, 21, 4, 1, 'y');
+        fillRect(r, 33, 20, 4, 2, 'z');
+      }
     } else if (pose === 'throw') {
       // Нерабочая рука прижата
       fillRect(r, 7, 27, 3, 7, 'j');
@@ -547,6 +574,7 @@
     v: P.vest, V: P.vestStripe,
     p: P.pants, P: P.pantsDark,
     b: P.boot,
+    x: '#8a4d20', y: '#d7a15a', z: '#4ea64a',
   };
 
   G.sprites = G.sprites || {};
@@ -560,6 +588,10 @@
     throw_up:    jb(makeJanitor('up',    0, 'throw')),
     throw_left:  jb(makeJanitor('left',  0, 'throw')),
     throw_right: jb(flipH(makeJanitor('left', 0, 'throw'))),
+    melee_down:  jb(makeJanitor('down',  0, 'melee')),
+    melee_up:    jb(makeJanitor('up',    0, 'melee')),
+    melee_left:  jb(makeJanitor('left',  0, 'melee')),
+    melee_right: jb(flipH(makeJanitor('left', 0, 'melee'))),
     slide_down:  jb(makeJanitor('down',  0, 'slide')),
     slide_up:    jb(makeJanitor('up',    0, 'slide')),
     slide_left:  jb(makeJanitor('left',  0, 'slide')),
@@ -770,6 +802,37 @@
       fillRect(r, 29, 39, 6, 5, 'R');
       fillRect(r, 13, 43, 6, 2, 'm');
       fillRect(r, 29, 43, 6, 2, 'm');
+    } else if (pose === 'melee') {
+      // Задние лапы стоят
+      fillRect(r, 13, 38, 6, 7, 'R');
+      fillRect(r, 13, 44, 6, 2, 'm');
+      fillRect(r, 29, 38, 6, 7, 'R');
+      fillRect(r, 29, 44, 6, 2, 'm');
+      if (dir === 'left') {
+        fillRect(r, 0, 28, 9, 3, 'R');
+        fillRect(r, 0, 29, 3, 2, 'w');
+        fillRect(r, 0, 25, 15, 3, 'x');
+        fillRect(r, 0, 24, 4, 1, 'y');
+        fillRect(r, 10, 23, 4, 2, 'z');
+      } else if (dir === 'up') {
+        fillRect(r, 36, 8, 4, 14, 'R');
+        fillRect(r, 36, 6, 4, 2, 'm');
+        fillRect(r, 37, 0, 3, 12, 'x');
+        fillRect(r, 36, 0, 1, 4, 'y');
+        fillRect(r, 39, 1, 3, 3, 'z');
+      } else if (dir === 'down') {
+        fillRect(r, 36, 26, 4, 14, 'R');
+        fillRect(r, 36, 38, 4, 2, 'w');
+        fillRect(r, 38, 34, 3, 14, 'x');
+        fillRect(r, 37, 43, 1, 5, 'y');
+        fillRect(r, 40, 41, 4, 3, 'z');
+      } else {
+        fillRect(r, 39, 28, 9, 3, 'R');
+        fillRect(r, 45, 29, 3, 2, 'w');
+        fillRect(r, 33, 25, 15, 3, 'x');
+        fillRect(r, 44, 24, 4, 1, 'y');
+        fillRect(r, 33, 23, 4, 2, 'z');
+      }
     } else if (pose === 'throw') {
       // Задние лапы стоят
       fillRect(r, 13, 38, 6, 7, 'R');
@@ -824,6 +887,9 @@
     R: P.raccoon2,
     w: P.raccoonE,
     m: P.raccoonM,
+    x: '#8a4d20',
+    y: '#d7a15a',
+    z: '#4ea64a',
   };
 
   function rb(rows) { return makeBitmap(rows, raccoonPalette); }
@@ -836,6 +902,10 @@
     throw_up:    rb(makeRaccoon('up',    0, 'throw')),
     throw_left:  rb(makeRaccoon('left',  0, 'throw')),
     throw_right: rb(flipH(makeRaccoon('left', 0, 'throw'))),
+    melee_down:  rb(makeRaccoon('down',  0, 'melee')),
+    melee_up:    rb(makeRaccoon('up',    0, 'melee')),
+    melee_left:  rb(makeRaccoon('left',  0, 'melee')),
+    melee_right: rb(flipH(makeRaccoon('left', 0, 'melee'))),
     slide_down:  rb(makeRaccoon('down',  0, 'slide')),
     slide_up:    rb(makeRaccoon('up',    0, 'slide')),
     slide_left:  rb(makeRaccoon('left',  0, 'slide')),

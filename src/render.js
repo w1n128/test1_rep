@@ -326,7 +326,7 @@
     } else if (p.sliding) {
       frame = sprites['slide_' + p.dir] || sprites[p.dir][0];
     } else if (p.attackT > 0) {
-      frame = sprites['throw_' + p.dir] || sprites[p.dir][0];
+      frame = sprites['melee_' + p.dir] || sprites['throw_' + p.dir] || sprites[p.dir][0];
     } else if (p.throwT > 0) {
       frame = sprites['throw_' + p.dir] || sprites[p.dir][0];
     } else {
