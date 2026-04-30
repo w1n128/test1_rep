@@ -1,5 +1,5 @@
-// Сетевой модуль: WebRTC P2P, host-authoritative протокол.
-// По умолчанию signaling идёт через ntfy.sh; PeerJS остался запасным режимом.
+// Сетевой модуль: host-authoritative протокол.
+// По умолчанию данные идут через ntfy.sh relay; прямой WebRTC и PeerJS остались запасными режимами.
 // Хост держит "истинное" состояние и шлёт снапшоты + события клиенту.
 // Клиент шлёт свой ввод хосту.
 (function () {
@@ -70,6 +70,7 @@
   let relayLastSnap = 0;
   let relayLastInput = 0;
   let connectedNotified = false;
+  let relayTimers = [];
 
   function normalizePeerError(err, fallback = 'network') {
     if (!err) return { type: fallback };
@@ -351,6 +352,28 @@
     }
   }
 
+  function preferDirectWebrtc() {
+    try {
+      const qs = queryParams();
+      return qs.get('netDirect') === '1' || qs.get('direct') === '1';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function clearRelayTimers() {
+    for (const t of relayTimers) {
+      clearTimeout(t);
+      clearInterval(t);
+    }
+    relayTimers = [];
+  }
+
+  function queueRelayTimer(timer) {
+    relayTimers.push(timer);
+    return timer;
+  }
+
   function makeSignalId(prefix) {
     return prefix + '-' + Math.random().toString(36).slice(2, 10);
   }
@@ -407,6 +430,7 @@
 
   function setupRelayChannel(remoteId) {
     if (!remoteId) return false;
+    clearRelayTimers();
     relayActive = true;
     relayRemoteId = remoteId;
     relayLastSnap = 0;
@@ -423,6 +447,36 @@
     };
     notifyConnected();
     return true;
+  }
+
+  function publishRelayReady(remoteId) {
+    if (!remoteId || connReady) return;
+    publishSignal({ type: 'relay-ready', to: remoteId }).catch(() => {});
+  }
+
+  function startRelayHost(remoteId) {
+    if (!remoteId) return;
+    relayRemoteId = remoteId;
+    publishRelayReady(remoteId);
+    queueRelayTimer(setInterval(() => publishRelayReady(remoteId), 800));
+  }
+
+  function sendRelayAck(remoteId) {
+    if (!remoteId) return;
+    for (let i = 0; i < 6; i++) {
+      queueRelayTimer(setTimeout(() => {
+        publishSignal({ type: 'relay-ack', to: remoteId }).catch(() => {});
+      }, i * 350));
+    }
+  }
+
+  function startJoinBroadcast() {
+    const sendJoin = () => {
+      if (connReady) return;
+      publishSignal({ type: 'join' }).catch(() => {});
+    };
+    sendJoin();
+    queueRelayTimer(setInterval(sendJoin, 1000));
   }
 
   function openSignal(code, token, onSignal, onOpen, onError) {
@@ -563,9 +617,8 @@
         if (msg.type === 'join' && !remoteSignalId) {
           remoteSignalId = msg.from;
           if (opts.onPending) opts.onPending();
-          if (forceRelay()) {
-            await publishSignal({ type: 'relay-ready', to: remoteSignalId });
-            setupRelayChannel(remoteSignalId);
+          if (forceRelay() || !preferDirectWebrtc()) {
+            startRelayHost(remoteSignalId);
             return;
           }
           timeout = setTimeout(fail, CONNECT_TIMEOUT_MS);
@@ -578,7 +631,9 @@
           return;
         }
         if (!remoteSignalId || msg.from !== remoteSignalId) return;
-        if (msg.type === 'relay') {
+        if (msg.type === 'relay-ack') {
+          setupRelayChannel(remoteSignalId);
+        } else if (msg.type === 'relay') {
           if (onMessageCb) onMessageCb(msg.data);
         } else if (msg.type === 'answer' && rawPc) {
           await rawPc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
@@ -627,6 +682,7 @@
         if (msg.type === 'relay-ready' && msg.to === selfSignalId) {
           remoteSignalId = msg.from;
           setupRelayChannel(remoteSignalId);
+          sendRelayAck(remoteSignalId);
           return;
         }
         if (msg.type === 'relay' && msg.to === selfSignalId) {
@@ -636,9 +692,10 @@
         }
         if (msg.type === 'offer' && msg.to === selfSignalId) {
           remoteSignalId = msg.from;
-          if (forceRelay()) {
-            await publishSignal({ type: 'relay-ready', to: remoteSignalId });
+          if (forceRelay() || !preferDirectWebrtc()) {
+            await publishSignal({ type: 'relay-ack', to: remoteSignalId });
             setupRelayChannel(remoteSignalId);
+            sendRelayAck(remoteSignalId);
             return;
           }
           const pc = createRawPeer(token);
@@ -656,13 +713,11 @@
         }
       },
       () => {
-        if (opts.onReady) opts.onReady(roomCode);
+          if (opts.onReady) opts.onReady(roomCode);
         if (!joined) {
           joined = true;
           timeout = setTimeout(fail, CONNECT_TIMEOUT_MS);
-          publishSignal({ type: 'join' }).catch((err) => {
-            if (opts.onError) opts.onError(normalizePeerError(err, 'signal-network'));
-          });
+          startJoinBroadcast();
         }
       },
       (err) => {
@@ -839,6 +894,7 @@
     relayLastSnap = 0;
     relayLastInput = 0;
     connectedNotified = false;
+    clearRelayTimers();
     signalTopic = null;
     try { if (oldConn) oldConn.close(); } catch (e) {}
     try { if (oldPeer) oldPeer.destroy(); } catch (e) {}
