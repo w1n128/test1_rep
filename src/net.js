@@ -1,4 +1,5 @@
-// Сетевой модуль: WebRTC через PeerJS, host-authoritative протокол.
+// Сетевой модуль: WebRTC P2P, host-authoritative протокол.
+// По умолчанию signaling идёт через ntfy.sh; PeerJS остался запасным режимом.
 // Хост держит "истинное" состояние и шлёт снапшоты + события клиенту.
 // Клиент шлёт свой ввод хосту.
 (function () {
@@ -11,6 +12,8 @@
   const PEER_OPEN_TIMEOUT_MS = 10000;
   const PEER_OPEN_ATTEMPTS = 3;
   const PEER_RETRY_DELAYS = [0, 900, 1800];
+  const SIGNAL_BASE = 'https://ntfy.sh';
+  const SIGNAL_PREFIX = 'svalkus-net-v2-';
   const OPENRELAY_AUTH = {
     username: 'openrelayproject',
     credential: 'openrelayproject',
@@ -54,6 +57,12 @@
   let lastError = null;
   let connReady = false;
   let sessionToken = 0;
+  let signalSource = null;
+  let signalTopic = null;
+  let rawPc = null;
+  let rawCandidateQueue = [];
+  let selfSignalId = '';
+  let remoteSignalId = '';
 
   function normalizePeerError(err, fallback = 'network') {
     if (!err) return { type: fallback };
@@ -98,6 +107,34 @@
     try { if (oldPeer) oldPeer.destroy(); } catch (e) {}
   }
 
+  function rtcConfig() {
+    return {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun.relay.metered.ca:80' },
+        { urls: 'stun:openrelay.metered.ca:80' },
+        {
+          urls: 'turn:openrelay.metered.ca:80',
+          ...OPENRELAY_AUTH,
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:80?transport=tcp',
+          ...OPENRELAY_AUTH,
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443',
+          ...OPENRELAY_AUTH,
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+          ...OPENRELAY_AUTH,
+        },
+      ],
+    };
+  }
+
   function ensurePeer(id) {
     if (typeof Peer === 'undefined') {
       throw new Error('PeerJS не загружен. Проверь интернет и CDN-скрипт в index.html.');
@@ -105,32 +142,7 @@
     return new Peer(id, {
       ...peerServerOptionsFromUrl(),
       debug: 3,
-      config: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun.relay.metered.ca:80' },
-          { urls: 'stun:openrelay.metered.ca:80' },
-          // Бесплатный TURN от openrelayproject — fallback при симметричном NAT
-          {
-            urls: 'turn:openrelay.metered.ca:80',
-            ...OPENRELAY_AUTH,
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:80?transport=tcp',
-            ...OPENRELAY_AUTH,
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:443',
-            ...OPENRELAY_AUTH,
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-            ...OPENRELAY_AUTH,
-          },
-        ],
-      },
+      config: rtcConfig(),
     });
   }
 
@@ -262,6 +274,267 @@
     });
   }
 
+  function signalBackend() {
+    try {
+      const qs = new URLSearchParams(window.location.search);
+      return (qs.get('signal') || 'ntfy').toLowerCase();
+    } catch (e) {
+      return 'ntfy';
+    }
+  }
+
+  function makeSignalId(prefix) {
+    return prefix + '-' + Math.random().toString(36).slice(2, 10);
+  }
+
+  function roomTopic(code) {
+    return SIGNAL_PREFIX + code.toLowerCase();
+  }
+
+  function closeRawOnly() {
+    const oldSource = signalSource;
+    const oldPc = rawPc;
+    const oldConn = conn;
+    signalSource = null;
+    rawPc = null;
+    conn = null;
+    connReady = false;
+    rawCandidateQueue = [];
+    try { if (oldSource) oldSource.close(); } catch (e) {}
+    try { if (oldConn && oldConn.close) oldConn.close(); } catch (e) {}
+    try { if (oldPc) oldPc.close(); } catch (e) {}
+  }
+
+  function publishSignal(msg) {
+    if (!signalTopic) return Promise.reject(new Error('no signal topic'));
+    msg.app = 'svalkus';
+    msg.v = PROTOCOL_VERSION;
+    msg.room = roomCode;
+    msg.from = selfSignalId;
+    msg.ts = Date.now();
+    return fetch(SIGNAL_BASE + '/' + signalTopic, {
+      method: 'POST',
+      body: JSON.stringify(msg),
+    });
+  }
+
+  function openSignal(code, token, onSignal, onOpen, onError) {
+    signalTopic = roomTopic(code);
+    const since = Math.floor(Date.now() / 1000);
+    const openedAt = Date.now();
+    const es = new EventSource(SIGNAL_BASE + '/' + signalTopic + '/sse?since=' + since);
+    signalSource = es;
+    es.onopen = () => {
+      if (token !== sessionToken) return;
+      if (onOpen) onOpen();
+    };
+    es.onmessage = (ev) => {
+      if (token !== sessionToken) return;
+      let envelope;
+      try { envelope = JSON.parse(ev.data); } catch (e) { return; }
+      if (!envelope || envelope.event !== 'message' || !envelope.message) return;
+      let msg;
+      try { msg = JSON.parse(envelope.message); } catch (e) { return; }
+      if (!msg || msg.app !== 'svalkus' || msg.v !== PROTOCOL_VERSION) return;
+      if (msg.ts && msg.ts < openedAt - 5000) return;
+      if (msg.room !== roomCode || msg.from === selfSignalId) return;
+      if (msg.to && msg.to !== selfSignalId) return;
+      onSignal(msg);
+    };
+    es.onerror = () => {
+      if (token !== sessionToken || connReady) return;
+      lastError = { type: 'signal-network' };
+      if (onError) onError(lastError);
+    };
+  }
+
+  function setupRawChannel(dc) {
+    const wrapper = {
+      get open() { return dc.readyState === 'open'; },
+      send(data) {
+        dc.send(typeof data === 'string' ? data : JSON.stringify(data));
+      },
+      close() { dc.close(); },
+    };
+    conn = wrapper;
+    dc.onmessage = (ev) => {
+      let data = ev.data;
+      try {
+        if (typeof data === 'string') data = JSON.parse(data);
+      } catch (e) { return; }
+      if (onMessageCb) onMessageCb(data);
+    };
+    dc.onclose = () => {
+      if (conn !== wrapper) return;
+      if (onClosedCb) onClosedCb('peer closed');
+      teardown();
+    };
+    dc.onerror = () => {
+      if (conn !== wrapper) return;
+      lastError = { type: 'webrtc' };
+      if (onClosedCb) onClosedCb('error: webrtc');
+      teardown();
+    };
+    dc.onopen = () => {
+      connReady = true;
+      if (onConnectedCb) onConnectedCb();
+    };
+    if (dc.readyState === 'open') dc.onopen();
+  }
+
+  function createRawPeer(token, onIceError) {
+    rawPc = new RTCPeerConnection(rtcConfig());
+    rawPc.onicecandidate = (ev) => {
+      if (token !== sessionToken || !ev.candidate || !remoteSignalId) return;
+      publishSignal({ type: 'candidate', to: remoteSignalId, candidate: ev.candidate }).catch(() => {});
+    };
+    rawPc.onicecandidateerror = (ev) => {
+      console.warn('[net] raw icecandidateerror:', ev.url, ev.errorCode, ev.errorText);
+      if (onIceError) onIceError(ev);
+    };
+    rawPc.onconnectionstatechange = () => {
+      console.log('[net] raw connectionState =', rawPc.connectionState);
+      if ((rawPc.connectionState === 'failed' || rawPc.connectionState === 'closed') && !connReady) {
+        lastError = { type: 'webrtc' };
+      }
+    };
+    rawPc.oniceconnectionstatechange = () => {
+      console.log('[net] raw iceConnectionState =', rawPc.iceConnectionState);
+    };
+    return rawPc;
+  }
+
+  async function addRawCandidate(candidate) {
+    if (!candidate) return;
+    if (!rawPc) {
+      rawCandidateQueue.push(candidate);
+      return;
+    }
+    if (!rawPc.remoteDescription) {
+      rawCandidateQueue.push(candidate);
+      return;
+    }
+    try { await rawPc.addIceCandidate(candidate); } catch (e) { console.warn('[net] addIceCandidate failed', e); }
+  }
+
+  async function flushRawCandidates() {
+    if (!rawPc || !rawPc.remoteDescription) return;
+    const q = rawCandidateQueue;
+    rawCandidateQueue = [];
+    for (const c of q) await addRawCandidate(c);
+  }
+
+  function hostNtfy(opts) {
+    if (peer || rawPc || signalSource) disconnect();
+    role = 'host';
+    onMessageCb = opts.onMessage || null;
+    onClosedCb = opts.onClose || null;
+    onConnectedCb = opts.onConnect || null;
+    lastError = null;
+    roomCode = (opts.code || generateCode()).toUpperCase();
+    selfSignalId = makeSignalId('host');
+    remoteSignalId = '';
+    rawCandidateQueue = [];
+    const token = ++sessionToken;
+    let timeout = null;
+    const fail = () => {
+      if (connReady || token !== sessionToken) return;
+      lastError = { type: 'timeout' };
+      if (opts.onError) opts.onError(lastError);
+    };
+    if (opts.onAttempt) opts.onAttempt(1, 1, null);
+    openSignal(
+      roomCode,
+      token,
+      async (msg) => {
+        if (msg.type === 'join' && !remoteSignalId) {
+          remoteSignalId = msg.from;
+          if (opts.onPending) opts.onPending();
+          timeout = setTimeout(fail, CONNECT_TIMEOUT_MS);
+          const pc = createRawPeer(token);
+          const dc = pc.createDataChannel('game');
+          setupRawChannel(dc);
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          await publishSignal({ type: 'offer', to: remoteSignalId, sdp: pc.localDescription });
+          return;
+        }
+        if (!remoteSignalId || msg.from !== remoteSignalId) return;
+        if (msg.type === 'answer' && rawPc) {
+          await rawPc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+          await flushRawCandidates();
+        } else if (msg.type === 'candidate') {
+          await addRawCandidate(msg.candidate);
+        }
+      },
+      () => {
+        if (opts.onReady) opts.onReady(roomCode);
+      },
+      (err) => {
+        if (timeout) clearTimeout(timeout);
+        if (opts.onError) opts.onError(err);
+      }
+    );
+    return roomCode;
+  }
+
+  function joinNtfy(code, opts) {
+    if (peer || rawPc || signalSource) disconnect();
+    role = 'client';
+    onMessageCb = opts.onMessage || null;
+    onClosedCb = opts.onClose || null;
+    onConnectedCb = opts.onConnect || null;
+    lastError = null;
+    roomCode = code.toUpperCase();
+    selfSignalId = makeSignalId('client');
+    remoteSignalId = 'host';
+    rawCandidateQueue = [];
+    const token = ++sessionToken;
+    let joined = false;
+    let timeout = null;
+    if (opts.onAttempt) opts.onAttempt(1, 1, null);
+    const fail = () => {
+      if (connReady || token !== sessionToken) return;
+      lastError = { type: 'timeout' };
+      if (opts.onError) opts.onError(lastError);
+    };
+    openSignal(
+      roomCode,
+      token,
+      async (msg) => {
+        if (msg.type === 'offer' && msg.to === selfSignalId) {
+          remoteSignalId = msg.from;
+          const pc = createRawPeer(token);
+          pc.ondatachannel = (ev) => setupRawChannel(ev.channel);
+          await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+          await flushRawCandidates();
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          await publishSignal({ type: 'answer', to: remoteSignalId, sdp: pc.localDescription });
+          return;
+        }
+        if (msg.to === selfSignalId && msg.type === 'candidate') {
+          if (!remoteSignalId || remoteSignalId === 'host') remoteSignalId = msg.from;
+          await addRawCandidate(msg.candidate);
+        }
+      },
+      () => {
+        if (opts.onReady) opts.onReady(roomCode);
+        if (!joined) {
+          joined = true;
+          timeout = setTimeout(fail, CONNECT_TIMEOUT_MS);
+          publishSignal({ type: 'join' }).catch((err) => {
+            if (opts.onError) opts.onError(normalizePeerError(err, 'signal-network'));
+          });
+        }
+      },
+      (err) => {
+        if (timeout) clearTimeout(timeout);
+        if (opts.onError) opts.onError(err);
+      }
+    );
+  }
+
   function waitForOpen(c, onOpen, onTimeout) {
     let done = false;
     const finish = () => {
@@ -296,7 +569,7 @@
     if (c.open) finish();
   }
 
-  function host(opts) {
+  function peerjsHost(opts) {
     if (peer) disconnect();
     role = 'host';
     onMessageCb = opts.onMessage || null;
@@ -347,7 +620,7 @@
     return ROOM_PREFIX + code + '-c-' + attempt + '-' + Math.random().toString(36).slice(2, 7);
   }
 
-  function join(code, opts) {
+  function peerjsJoin(code, opts) {
     if (peer) disconnect();
     role = 'client';
     onMessageCb = opts.onMessage || null;
@@ -388,6 +661,14 @@
     );
   }
 
+  function host(opts) {
+    return signalBackend() === 'peerjs' ? peerjsHost(opts) : hostNtfy(opts);
+  }
+
+  function join(code, opts) {
+    return signalBackend() === 'peerjs' ? peerjsJoin(code, opts) : joinNtfy(code, opts);
+  }
+
   function send(msg) {
     if (!conn || !conn.open) return false;
     try {
@@ -402,13 +683,23 @@
     sessionToken++;
     const oldConn = conn;
     const oldPeer = peer;
+    const oldPc = rawPc;
+    const oldSource = signalSource;
     conn = null;
     peer = null;
+    rawPc = null;
+    signalSource = null;
     role = null;
     roomCode = null;
     connReady = false;
+    rawCandidateQueue = [];
+    selfSignalId = '';
+    remoteSignalId = '';
+    signalTopic = null;
     try { if (oldConn) oldConn.close(); } catch (e) {}
     try { if (oldPeer) oldPeer.destroy(); } catch (e) {}
+    try { if (oldPc) oldPc.close(); } catch (e) {}
+    try { if (oldSource) oldSource.close(); } catch (e) {}
   }
 
   function disconnect() {

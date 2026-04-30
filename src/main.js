@@ -262,6 +262,8 @@
     const t = err && err.type ? String(err.type).toLowerCase() : String(err || '').toLowerCase();
     if (t === 'peer-unavailable') return 'Комнаты с таким кодом нет';
     if (t === 'timeout') return 'Не удалось открыть канал. Проверьте код и обновите обе страницы.';
+    if (t === 'signal-network') return 'Не удалось открыть сигнальный канал. Попробуйте другую сеть/VPN.';
+    if (t === 'webrtc') return 'WebRTC-канал не открылся. Попробуйте другую сеть или VPN.';
     if (t === 'network' || t === 'server-error' || t === 'socket-error' || t === 'socket-closed') {
       return 'Ошибка сети PeerJS. Обновите страницу или попробуйте другой интернет.';
     }
@@ -287,6 +289,9 @@
       },
       onMessage: onNetMessage,
       onClose: onNetClose,
+      onAttempt: () => {
+        lobbyStatus = 'Открываю сигнальный канал...';
+      },
       onRetry: (n, max) => {
         lobbyStatus = 'PeerJS не ответил, повтор ' + n + '/' + max + '...';
       },
@@ -311,6 +316,9 @@
       },
       onMessage: onNetMessage,
       onClose: onNetClose,
+      onAttempt: () => {
+        lobbyStatus = 'Открываю сигнальный канал...';
+      },
       onRetry: (n, max) => {
         lobbyStatus = 'PeerJS не ответил, повтор ' + n + '/' + max + '...';
       },
