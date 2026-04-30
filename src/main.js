@@ -93,11 +93,6 @@
   let introT = 0;
   let noviceMode = false;
   G.match = { novice: false };
-  const NET_SNAPSHOT_INTERVAL = 1 / 30;
-  const NET_INPUT_KEEPALIVE = 1 / 15;
-  const NET_BUFFER_LIMIT = 16 * 1024;
-  let inputSendInterval = 0;
-  let lastInputPayload = '';
 
   function syncReactiveMusic() {
     if (!G.audio || !G.audio.music || !players.length) return;
@@ -162,8 +157,6 @@
 
     winnerId = null;
     snapshotInterval = 0;
-    inputSendInterval = 0;
-    lastInputPayload = '';
     matchTime = 0;
     introT = C.PREGAME_RULES_DURATION;
     state = STATE.INTRO;
@@ -463,7 +456,7 @@
         if (G.render && G.render.updateShake) G.render.updateShake(dt);
         for (const pk of (pickupManager ? pickupManager.list : [])) pk.animT += dt;
 
-        // Собрать ввод и отправить хосту только при изменении или коротким keepalive.
+        // Собрать ввод и отправить хосту (только при изменении или каждые ~3 кадра)
         const local = G.input.p1;
         const actions = {
           up: local.isDown('up'), down: local.isDown('down'),
@@ -477,14 +470,7 @@
         for (const a of ['place', 'dash', 'switchNext', 'switchPrev']) {
           if (local.wasPressed(a)) justPressed.push(a);
         }
-        inputSendInterval += dt;
-        const payload = { actions, justPressed };
-        const encodedPayload = JSON.stringify(payload);
-        if (justPressed.length || encodedPayload !== lastInputPayload || inputSendInterval >= NET_INPUT_KEEPALIVE) {
-          G.net.send({ t: 'input', actions, justPressed });
-          lastInputPayload = encodedPayload;
-          inputSendInterval = 0;
-        }
+        G.net.send({ t: 'input', actions, justPressed });
         return;
       }
 
@@ -525,27 +511,18 @@
       if (G.render && G.render.updateShake) G.render.updateShake(dt);
       syncReactiveMusic();
 
-      // Хост шлёт снапшоты с ограничением частоты и не копит очередь в DataChannel.
+      // Хост шлёт снапшот каждый тик (60Hz) — для плавной анимации клиента
       if (mode === 'net' && netRole === 'host') {
-        snapshotInterval += dt;
-        if (snapshotInterval >= NET_SNAPSHOT_INTERVAL) {
-          const buffered = G.net.bufferedAmount ? G.net.bufferedAmount() : 0;
-          if (buffered < NET_BUFFER_LIMIT) {
-            snapshotInterval %= NET_SNAPSHOT_INTERVAL;
-            G.net.send({
-              t: 'snap',
-              time,
-              matchTime,
-              p: players.map(p => p.serialize()),
-              tr: trapManager.serialize(),
-              pk: pickupManager.serialize(),
-              ae: arenaEventManager ? arenaEventManager.serialize() : null,
-              ev: G.net.flushEvents(),
-            });
-          } else {
-            snapshotInterval = NET_SNAPSHOT_INTERVAL;
-          }
-        }
+        G.net.send({
+          t: 'snap',
+          time,
+          matchTime,
+          p: players.map(p => p.serialize()),
+          tr: trapManager.serialize(),
+          pk: pickupManager.serialize(),
+          ae: arenaEventManager ? arenaEventManager.serialize() : null,
+          ev: G.net.flushEvents(),
+        });
       }
 
       // Условие победы

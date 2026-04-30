@@ -11,7 +11,6 @@
   const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // без 0/O/1/I/L
   const CONNECT_TIMEOUT_MS = 20000;
   const RELAY_FALLBACK_TIMEOUT_MS = 10000;
-  const SNAPSHOT_BUFFER_LIMIT = 16 * 1024;
   const PEER_OPEN_TIMEOUT_MS = 10000;
   const PEER_OPEN_ATTEMPTS = 3;
   const PEER_RETRY_DELAYS = [0, 900, 1800];
@@ -420,7 +419,6 @@
     relayLastInput = 0;
     conn = {
       get open() { return relayActive; },
-      bufferedAmount() { return 0; },
       send(data) {
         if (!relayActive || !relayRemoteId) return false;
         if (shouldDropRelayData(data)) return true;
@@ -496,11 +494,8 @@
   function setupRawChannel(dc) {
     const wrapper = {
       get open() { return dc.readyState === 'open'; },
-      bufferedAmount() { return dc.bufferedAmount || 0; },
       send(data) {
-        if (data && data.t === 'snap' && dc.bufferedAmount > SNAPSHOT_BUFFER_LIMIT) return false;
         dc.send(typeof data === 'string' ? data : JSON.stringify(data));
-        return true;
       },
       close() { dc.close(); },
     };
@@ -864,17 +859,11 @@
   function send(msg) {
     if (!conn || !conn.open) return false;
     try {
-      return conn.send(msg) !== false;
+      conn.send(msg);
+      return true;
     } catch (e) {
       return false;
     }
-  }
-
-  function bufferedAmount() {
-    if (!conn) return 0;
-    if (typeof conn.bufferedAmount === 'function') return conn.bufferedAmount();
-    if (conn._dc && typeof conn._dc.bufferedAmount === 'number') return conn._dc.bufferedAmount;
-    return 0;
   }
 
   function teardown() {
@@ -952,7 +941,7 @@
   G.net = {
     PROTOCOL_VERSION,
     NetInputDevice,
-    host, join, send, bufferedAmount, disconnect,
+    host, join, send, disconnect,
     generateCode,
     isHost, isClient, isConnected, getRole, getCode, getError,
     flushEvents, applyEvents,
