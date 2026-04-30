@@ -55,6 +55,7 @@
     return { x: 0, y: 1 };
   }
   function nightState(matchTime) {
+    if (!C.nightEnabled()) return { active: false, remaining: 0 };
     const cycle = C.NIGHT_DAY_DURATION + C.NIGHT_DURATION;
     const phase = ((matchTime % cycle) + cycle) % cycle;
     const active = phase >= C.NIGHT_DAY_DURATION;
@@ -404,19 +405,6 @@
       ctx.globalCompositeOperation = 'source-over';
     }
 
-    if (p.emotionT > 0) {
-      const k = p.emotionT;
-      ctx.save();
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.font = 'bold 12px monospace';
-      const label = p.emotion === 'panic' ? '!' : p.emotion === 'dash' ? '»' : p.emotion === 'dizzy' ? '✦' : 'АУЧ';
-      ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(Math.round(p.x - 18), Math.round(drawY - 16), 36, 14);
-      ctx.fillStyle = p.emotion === 'panic' ? '#ff8060' : p.emotion === 'dash' ? '#a0e0ff' : '#fff060';
-      ctx.fillText(label, p.x, drawY - 9 - Math.sin(k * 20) * 2);
-      ctx.restore();
-    }
   }
 
   function drawAimLine(ctx, p, viewer, litTiles) {

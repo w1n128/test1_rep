@@ -33,6 +33,9 @@
     THROWABLE_TYPES: ['can'],
     get PICKUP_TYPES() { return this.TRAP_TYPES.concat(this.COMBAT_TYPES, this.THROWABLE_TYPES); },
     get ITEM_TYPES() { return this.TRAP_TYPES.concat(this.COMBAT_TYPES, this.THROWABLE_TYPES, this.BAIT_TYPES); },
+    NOVICE_TRAP_TYPES: ['mousetrap', 'firecracker', 'banana'],
+    NOVICE_ITEM_TYPES: ['mousetrap', 'firecracker', 'banana', 'branch'],
+    NOVICE_SPEED_MUL: 0.7,
     POWERUP_TYPES: ['star', 'broom', 'boombox'],
     POWERUP_WEIGHTS: { star: 1, broom: 2, boombox: 2 },
     BAIT_TYPES: ['pizza', 'diamond'],
@@ -86,6 +89,34 @@
     ARENA_EVENT_MIN: 32.0,
     ARENA_EVENT_MAX: 44.0,
     ARENA_EVENT_DURATION: 6.0,
+
+    isNovice() {
+      return !!(window.G && window.G.match && window.G.match.novice);
+    },
+    currentTrapTypes() {
+      return this.isNovice() ? this.NOVICE_TRAP_TYPES : this.TRAP_TYPES;
+    },
+    currentPickupTypes() {
+      return this.isNovice() ? this.NOVICE_ITEM_TYPES : this.PICKUP_TYPES;
+    },
+    currentItemTypes() {
+      return this.isNovice() ? this.NOVICE_ITEM_TYPES : this.ITEM_TYPES;
+    },
+    currentPowerupTypes() {
+      return this.isNovice() ? [] : this.POWERUP_TYPES;
+    },
+    currentPlayerSpeed() {
+      return this.PLAYER_SPEED * (this.isNovice() ? this.NOVICE_SPEED_MUL : 1);
+    },
+    dashEnabled() {
+      return !this.isNovice();
+    },
+    nightEnabled() {
+      return !this.isNovice();
+    },
+    arenaEventsEnabled() {
+      return !this.isNovice();
+    },
   };
 
   G.PALETTE = {

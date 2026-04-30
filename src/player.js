@@ -43,18 +43,21 @@
       // Стартовые припасы — чтобы прототип сразу был интерактивным.
       this.inventory.mousetrap = 2;
       this.inventory.firecracker = 1;
-      this.inventory.trapdoor = 1;
       this.inventory.banana = 1;
       this.inventory.branch = 1;
-      this.inventory.can = 1;
-      if (this.character === 'janitor') this.inventory.diamond = 1;
-      if (this.character === 'raccoon') this.inventory.pizza = 1;
+      if (!C.isNovice()) {
+        this.inventory.trapdoor = 1;
+        this.inventory.can = 1;
+        if (this.character === 'janitor') this.inventory.diamond = 1;
+        if (this.character === 'raccoon') this.inventory.pizza = 1;
+      }
     }
 
     get tileX() { return Math.floor(this.x / C.TILE); }
     get tileY() { return Math.floor(this.y / C.TILE); }
 
     itemTypes() {
+      if (C.isNovice()) return C.NOVICE_ITEM_TYPES;
       const bait = this.character === 'janitor' ? 'diamond' : 'pizza';
       return C.TRAP_TYPES.concat(C.COMBAT_TYPES, C.THROWABLE_TYPES, [bait]);
     }
@@ -275,7 +278,7 @@
         dx *= inv; dy *= inv;
       }
 
-      if (this.input.wasPressed && this.input.wasPressed('dash') && this.dashCD <= 0) {
+      if (C.dashEnabled() && this.input.wasPressed && this.input.wasPressed('dash') && this.dashCD <= 0) {
         let dashDx = dx, dashDy = dy;
         if (dashDx === 0 && dashDy === 0) {
           const d = vecFromDir(this.dir);
@@ -296,7 +299,7 @@
 
       const eventMul = window.G && window.G.arenaEvents && window.G.arenaEvents.speedMul ? window.G.arenaEvents.speedMul() : 1;
       const lastChanceMul = this.hp === 1 ? C.LAST_CHANCE_SPEED_MUL : 1;
-      const speed = C.PLAYER_SPEED * eventMul * lastChanceMul * (this.starT > 0 ? C.STAR_SPEED_MUL : 1);
+      const speed = C.currentPlayerSpeed() * eventMul * lastChanceMul * (this.starT > 0 ? C.STAR_SPEED_MUL : 1);
       const moved = this.tryMove(dx * speed * dt, 0) | this.tryMove(0, dy * speed * dt);
       this.moving = (dx !== 0 || dy !== 0);
       if (this.moving) {

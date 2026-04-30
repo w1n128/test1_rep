@@ -100,7 +100,7 @@
 
     spawnTrash(players, traps, pickups) {
       if (!pickups) return;
-      const types = C.TRAP_TYPES;
+      const types = C.currentTrapTypes();
       for (let i = 0; i < 3; i++) {
         const tile = randomFreeTile(players, traps, pickups);
         if (!tile) continue;

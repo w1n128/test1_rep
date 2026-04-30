@@ -43,21 +43,24 @@
     randomPowerupType() {
       const weights = C.POWERUP_WEIGHTS || {};
       let total = 0;
-      for (const type of C.POWERUP_TYPES) total += weights[type] || 1;
+      const types = C.currentPowerupTypes();
+      for (const type of types) total += weights[type] || 1;
       let r = Math.random() * total;
-      for (const type of C.POWERUP_TYPES) {
+      for (const type of types) {
         r -= weights[type] || 1;
         if (r <= 0) return type;
       }
-      return C.POWERUP_TYPES[0];
+      return types[0];
     }
     spawnRandom() {
       // С шансом POWERUP_SPAWN_CHANCE — power-up, иначе обычная ловушка.
       let type;
-      if (Math.random() < C.POWERUP_SPAWN_CHANCE) {
+      const powerups = C.currentPowerupTypes();
+      const pickups = C.currentPickupTypes();
+      if (powerups.length > 0 && Math.random() < C.POWERUP_SPAWN_CHANCE) {
         type = this.randomPowerupType();
       } else {
-        type = C.PICKUP_TYPES[Math.floor(Math.random() * C.PICKUP_TYPES.length)];
+        type = pickups[Math.floor(Math.random() * pickups.length)];
       }
       for (let attempt = 0; attempt < 50; attempt++) {
         const x = 1 + Math.floor(Math.random() * (C.ARENA_W - 2));

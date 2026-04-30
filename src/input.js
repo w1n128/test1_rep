@@ -30,7 +30,7 @@
   });
   const p2 = new InputDevice('p2', {
     ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
-    Period: 'place', Comma: 'switchNext', ShiftRight: 'dash', Slash: 'dash',
+    Period: 'place', Comma: 'switchPrev', Slash: 'switchNext', ShiftRight: 'dash',
   });
 
   // Глобальное меню/системные команды.
@@ -39,6 +39,7 @@
     Digit1: 'mode1',
     Digit2: 'mode2',
     Digit3: 'mode3',
+    Digit4: 'mode4',
     Escape: 'pause',
     KeyR: 'restart',
     KeyM: 'menu',

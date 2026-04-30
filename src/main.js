@@ -91,6 +91,8 @@
   let time = 0;
   let matchTime = 0;
   let introT = 0;
+  let noviceMode = false;
+  G.match = { novice: false };
 
   function syncReactiveMusic() {
     if (!G.audio || !G.audio.music || !players.length) return;
@@ -102,11 +104,13 @@
 
   function startMatch(chosenMode, opts = {}) {
     mode = chosenMode;
+    noviceMode = !!opts.novice && mode !== 'net';
+    G.match = { novice: noviceMode };
     netRole = opts.netRole || null;
     netInputDevice = null;
     trapManager = new G.TrapManager();
     pickupManager = new G.PickupManager();
-    arenaEventManager = new G.ArenaEventManager();
+    arenaEventManager = C.arenaEventsEnabled() ? new G.ArenaEventManager() : null;
 
     let p1Input, p2Input;
     if (mode === 'net') {
@@ -175,6 +179,8 @@
     ai = null;
     netRole = null;
     netInputDevice = null;
+    noviceMode = false;
+    G.match = { novice: false };
     G.trapManager = null;
     G.pickupManager = null;
     G.arenaEvents = null;
@@ -335,10 +341,11 @@
     time += dt;
 
     if (state === STATE.MENU) {
-      const total = 3;
+      const total = 4;
       if (G.input.sys.wasPressed('mode1')) { startMatch('cpu'); return; }
       if (G.input.sys.wasPressed('mode2')) { startMatch('pvp'); return; }
       if (G.input.sys.wasPressed('mode3')) { state = STATE.MENU_NET; netMenuChoice = 0; return; }
+      if (G.input.sys.wasPressed('mode4')) { startMatch('cpu', { novice: true }); return; }
       if (G.input.p1.wasPressed('up') || G.input.p2.wasPressed('up')) {
         menuChoice = (menuChoice - 1 + total) % total;
       }
@@ -348,7 +355,8 @@
       if (G.input.sys.wasPressed('confirm') || G.input.p1.wasPressed('place') || G.input.p2.wasPressed('place')) {
         if (menuChoice === 0) startMatch('cpu');
         else if (menuChoice === 1) startMatch('pvp');
-        else { state = STATE.MENU_NET; netMenuChoice = 0; }
+        else if (menuChoice === 2) { state = STATE.MENU_NET; netMenuChoice = 0; }
+        else startMatch('cpu', { novice: true });
       }
       return;
     }
@@ -528,8 +536,8 @@
     if (state === STATE.GAMEOVER) {
       if (G.input.sys.wasPressed('menu'))    { returnToMenu(); return; }
       if (mode !== 'net') {
-        if (G.input.sys.wasPressed('restart')) { startMatch(mode); return; }
-        if (G.input.sys.wasPressed('confirm')) { startMatch(mode); return; }
+        if (G.input.sys.wasPressed('restart')) { startMatch(mode, { novice: noviceMode }); return; }
+        if (G.input.sys.wasPressed('confirm')) { startMatch(mode, { novice: noviceMode }); return; }
       }
       return;
     }
@@ -647,9 +655,10 @@
       ['1', '1P vs CPU', '— один игрок против компьютера'],
       ['2', '2P Hot Seat', '— два игрока за одной клавиатурой'],
       ['3', 'По сети', '— игра с другом через интернет'],
+      ['4', 'Режим новичка', '— спокойный 1P: меньше предметов и скорость ниже'],
     ];
     for (let i = 0; i < opts.length; i++) {
-      const y = 312 + i * 40;
+      const y = 314 + i * 38;
       const sel = menuChoice === i;
       ctx.fillStyle = sel ? '#fff060' : '#888';
       ctx.font = 'bold 18px monospace';
@@ -666,9 +675,9 @@
     ctx.textAlign = 'center';
     ctx.fillText('Управление 1: WASD движение, F использовать, Q/E переключить', cx, 486);
     ctx.fillStyle = '#9cc';
-    ctx.fillText('Управление 2: стрелки, «.» использовать, «,» переключить', cx, 504);
+    ctx.fillText('Управление 2: стрелки, «.» использовать, / вперёд, «,» назад', cx, 504);
     ctx.fillStyle = '#ccc';
-    ctx.fillText('Enter / 1 / 2 / 3 — старт.  Esc — пауза.  M — в меню.', cx, 536);
+    ctx.fillText('Enter / 1 / 2 / 3 / 4 — старт.  Esc — пауза.  M — в меню.', cx, 536);
   }
 
   function drawMenuChase(cx, y) {
@@ -856,9 +865,10 @@
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#222';
     ctx.font = 'bold 36px monospace';
-    ctx.fillText('КРАТКИЕ ПРАВИЛА', cx + 2, 46);
+    const title = noviceMode ? 'РЕЖИМ НОВИЧКА' : 'КРАТКИЕ ПРАВИЛА';
+    ctx.fillText(title, cx + 2, 46);
     ctx.fillStyle = '#fff060';
-    ctx.fillText('КРАТКИЕ ПРАВИЛА', cx, 44);
+    ctx.fillText(title, cx, 44);
 
     ctx.font = 'bold 72px monospace';
     ctx.fillStyle = '#222';
@@ -866,7 +876,13 @@
     ctx.fillStyle = '#ffe060';
     ctx.fillText(String(count), cx, 100);
 
-    const lines = [
+    const lines = noviceMode ? [
+      'Цель: первым выбить сопернику все 5 жизней.',
+      'F — использовать выбранный предмет, Q/E — переключать инвентарь.',
+      'Доступны только мышеловка, банан, петарда и ветка.',
+      'Ночи, случайных событий, рывка, звезды, метлы и магнитофона здесь нет.',
+      'Скорость персонажей снижена на 30%, чтобы спокойно освоиться.',
+    ] : [
       'Цель: первым выбить сопернику все 5 жизней.',
       'F — использовать предмет. Shift — рывок с перезарядкой.',
       'Ветка бьёт на 1 клетку, банка летит по направлению взгляда.',
@@ -930,11 +946,6 @@
         desc: 'Фитиль 0.735 сек, взрыв в радиусе 3 тайла, урон 1. До 3 в инвентаре.',
       },
       {
-        type: 'trapdoor',
-        name: 'Люк',
-        desc: 'Невидим противнику. Урон 1 + проваливает на 2 сек. До 3 в инвентаре.',
-      },
-      {
         type: 'banana',
         name: 'Банановая кожура',
         desc: 'Бросок на 3 тайла вперёд. Урон 1 + длинное скольжение без управления. До 3 в инвентаре.',
@@ -944,12 +955,19 @@
         name: 'Ветка',
         desc: 'F: одноразовый удар на 1 клетку, урон 1 + микростан.',
       },
-      {
+    ];
+    if (!noviceMode) {
+      rules.splice(2, 0, {
+        type: 'trapdoor',
+        name: 'Люк',
+        desc: 'Невидим противнику. Урон 1 + проваливает на 2 сек. До 3 в инвентаре.',
+      });
+      rules.push({
         type: 'can',
         name: 'Банка',
         desc: 'F: бросок по направлению взгляда на 5 клеток, урон 1 + короткая остановка.',
-      },
-    ];
+      });
+    }
 
     const startY = 138;
     const rowH = 48;
@@ -980,15 +998,26 @@
     ctx.font = '12px monospace';
     ctx.fillStyle = '#9c9';
     const baseY = startY + rules.length * rowH + 14;
-    ctx.fillText('Управление 1 (Дворник): WASD движение, Shift рывок, F использовать, Q/E переключить', cx, baseY);
+    ctx.fillText(noviceMode
+      ? 'Управление 1 (Дворник): WASD движение, F использовать, Q/E переключить'
+      : 'Управление 1 (Дворник): WASD движение, Shift рывок, F использовать, Q/E переключить', cx, baseY);
     ctx.fillStyle = '#9cc';
-    ctx.fillText('Управление 2 (Енот): стрелки, Right Shift или / рывок, «.» использовать, «,» переключить', cx, baseY + 18);
+    ctx.fillText(noviceMode
+      ? 'Управление 2 (Енот): стрелки, «.» использовать, / вперёд, «,» назад'
+      : 'Управление 2 (Енот): стрелки, Right Shift рывок, «.» использовать, / вперёд, «,» назад', cx, baseY + 18);
     ctx.fillStyle = '#ccc';
     ctx.fillText('Получил 5 ударов — проиграл. Активных ловушек одновременно: до 10.', cx, baseY + 40);
-    ctx.fillStyle = '#a0e0ff';
-    ctx.fillText('После 90 сек наступает ночь на 60 сек: динамика видна только в луче фонарика.', cx, baseY + 62);
-    ctx.fillStyle = '#ffe060';
-    ctx.fillText('При 1 HP включается последний шанс: рывок сразу готов и скорость чуть выше.', cx, baseY + 84);
+    if (noviceMode) {
+      ctx.fillStyle = '#a0e0ff';
+      ctx.fillText('Новичок: без ночи, событий, рывка, звезды, метлы, магнитофона, люка и банки.', cx, baseY + 62);
+      ctx.fillStyle = '#ffe060';
+      ctx.fillText('Скорость персонажей снижена на 30%, доступные предметы проще читать.', cx, baseY + 84);
+    } else {
+      ctx.fillStyle = '#a0e0ff';
+      ctx.fillText('После 90 сек наступает ночь на 60 сек: динамика видна только в луче фонарика.', cx, baseY + 62);
+      ctx.fillStyle = '#ffe060';
+      ctx.fillText('При 1 HP включается последний шанс: рывок сразу готов и скорость чуть выше.', cx, baseY + 84);
+    }
   }
 
   function drawOverlay(title, sub) {

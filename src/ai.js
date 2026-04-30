@@ -92,7 +92,7 @@
     consume() { this._justPressed = {}; }
 
     pickAvailableTrap() {
-      const have = C.TRAP_TYPES.filter((t) => this.player.inventory[t] > 0);
+      const have = C.currentTrapTypes().filter((t) => this.player.inventory[t] > 0);
       if (!have.length) return null;
       return have[Math.floor(Math.random() * have.length)];
     }
@@ -125,6 +125,8 @@
       // 1) Близкий пикап
       let bestPk = null, bestPkD = Infinity;
       for (const pk of this.pickups.list) {
+        if (C.currentPickupTypes().indexOf(pk.type) < 0) continue;
+        if (pk.type === 'branch' && this.player.inventory.branch > 0) continue;
         if (this.player.inventory[pk.type] >= C.INVENTORY_MAX_PER_TYPE) continue;
         const d = Math.abs(pk.tileX - px) + Math.abs(pk.tileY - py);
         if (d <= C.AI_PICKUP_RADIUS_TILES && d < bestPkD) {
@@ -146,6 +148,7 @@
         const dOp = Math.abs(ox - px) + Math.abs(oy - py);
         const bait = this.player.character === 'raccoon' ? 'pizza' : 'diamond';
         if (
+          !C.isNovice() &&
           this.matchT >= C.AI_BAIT_START_DELAY &&
           this.baitCD <= 0 &&
           this.player.inventory[bait] > 0 &&
@@ -268,7 +271,7 @@
         const cy = next[1] * C.TILE + C.TILE / 2;
         const dx = cx - this.player.x;
         const dy = cy - this.player.y;
-        const arrive = Math.max(3, C.PLAYER_SPEED * dt * 1.1);
+        const arrive = Math.max(3, C.currentPlayerSpeed() * dt * 1.1);
         if (Math.abs(dx) <= arrive && Math.abs(dy) <= arrive) {
           this.player.x = cx;
           this.player.y = cy;
@@ -283,6 +286,7 @@
           if (Math.abs(dx) > 6) this._actions[dx > 0 ? 'right' : 'left'] = true;
         }
         if (
+          C.dashEnabled() &&
           this.player.dashCD <= 0 &&
           this.opponent &&
           this.opponent.alive &&

@@ -104,10 +104,12 @@
       ctx.fillStyle = '#ff8060';
       ctx.fillText('ПОСЛЕДНИЙ ШАНС', viewportX + 8, heartsY + 18);
     }
-    const dashReady = (player.dashCD || 0) <= 0;
-    ctx.font = 'bold 10px monospace';
-    ctx.fillStyle = dashReady ? '#a0e0ff' : '#777';
-    ctx.fillText(dashReady ? 'SHIFT: РЫВОК' : 'РЫВОК ' + Math.ceil(player.dashCD) + 'с', viewportX + 8, heartsY + 32);
+    if (C.dashEnabled()) {
+      const dashReady = (player.dashCD || 0) <= 0;
+      ctx.font = 'bold 10px monospace';
+      ctx.fillStyle = dashReady ? '#a0e0ff' : '#777';
+      ctx.fillText(dashReady ? 'SHIFT: РЫВОК' : 'РЫВОК ' + Math.ceil(player.dashCD) + 'с', viewportX + 8, heartsY + 32);
+    }
 
     // Инвентарь: ловушки + одноразовые приманки.
     const slotW = 38, slotH = 24;
