@@ -8,6 +8,9 @@
   const ROOM_PREFIX = 'tjvse-'; // префикс к коду чтобы не пересекаться с чужими peer-id
   const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // без 0/O/1/I/L
   const CONNECT_TIMEOUT_MS = 20000;
+  const PEER_OPEN_TIMEOUT_MS = 10000;
+  const PEER_OPEN_ATTEMPTS = 3;
+  const PEER_RETRY_DELAYS = [0, 900, 1800];
   const OPENRELAY_AUTH = {
     username: 'openrelayproject',
     credential: 'openrelayproject',
@@ -50,12 +53,57 @@
   let onConnectedCb = null;
   let lastError = null;
   let connReady = false;
+  let sessionToken = 0;
+
+  function normalizePeerError(err, fallback = 'network') {
+    if (!err) return { type: fallback };
+    if (typeof err === 'string') return { type: err };
+    if (!err.type) err.type = fallback;
+    return err;
+  }
+
+  function isRetryablePeerError(err) {
+    const t = (err && err.type ? err.type : '').toLowerCase();
+    return t === 'network' || t === 'server-error' || t === 'socket-error' ||
+      t === 'socket-closed' || t === 'disconnected' || t === 'timeout';
+  }
+
+  function peerServerOptionsFromUrl() {
+    try {
+      const qs = new URLSearchParams(window.location.search);
+      const host = qs.get('peerHost');
+      if (!host) return {};
+      const opts = { host };
+      const port = parseInt(qs.get('peerPort') || '', 10);
+      if (Number.isFinite(port)) opts.port = port;
+      const path = qs.get('peerPath');
+      if (path) opts.path = path;
+      const key = qs.get('peerKey');
+      if (key) opts.key = key;
+      const secure = qs.get('peerSecure');
+      if (secure != null) opts.secure = secure !== '0' && secure !== 'false';
+      return opts;
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function closePeerOnly() {
+    const oldConn = conn;
+    const oldPeer = peer;
+    conn = null;
+    peer = null;
+    connReady = false;
+    try { if (oldConn) oldConn.close(); } catch (e) {}
+    try { if (oldPeer) oldPeer.destroy(); } catch (e) {}
+  }
 
   function ensurePeer(id) {
     if (typeof Peer === 'undefined') {
       throw new Error('PeerJS не загружен. Проверь интернет и CDN-скрипт в index.html.');
     }
     return new Peer(id, {
+      ...peerServerOptionsFromUrl(),
       debug: 3,
       config: {
         iceServers: [
@@ -84,6 +132,87 @@
         ],
       },
     });
+  }
+
+  function openPeerWithRetry(idForAttempt, hooks) {
+    const token = ++sessionToken;
+    let attempt = 0;
+
+    const launch = () => {
+      if (token !== sessionToken) return;
+      closePeerOnly();
+
+      const id = idForAttempt(attempt);
+      let p = null;
+      try {
+        p = ensurePeer(id);
+        peer = p;
+      } catch (err) {
+        lastError = normalizePeerError(err);
+        if (hooks.onError) hooks.onError(lastError);
+        return;
+      }
+
+      if (hooks.onAttempt) hooks.onAttempt(attempt + 1, PEER_OPEN_ATTEMPTS, id);
+      if (hooks.attach) hooks.attach(p, token);
+
+      let opened = false;
+      let settled = false;
+      const timer = setTimeout(() => {
+        handleOpenFailure({ type: 'timeout', message: 'PeerJS open timeout' });
+      }, PEER_OPEN_TIMEOUT_MS);
+
+      const retryOrFail = (err) => {
+        if (settled) return;
+        settled = true;
+        lastError = normalizePeerError(err);
+        closePeerOnly();
+        if (isRetryablePeerError(lastError) && attempt < PEER_OPEN_ATTEMPTS - 1) {
+          attempt++;
+          if (hooks.onRetry) hooks.onRetry(attempt + 1, PEER_OPEN_ATTEMPTS, lastError);
+          setTimeout(launch, PEER_RETRY_DELAYS[attempt] || 1000);
+          return;
+        }
+        if (hooks.onError) hooks.onError(lastError);
+      };
+
+      function handleOpenFailure(err) {
+        if (token !== sessionToken || opened || settled) return;
+        clearTimeout(timer);
+        retryOrFail(err);
+      }
+
+      function handlePostOpenProblem(err) {
+        if (token !== sessionToken || settled) return;
+        lastError = normalizePeerError(err);
+        if (!connReady && isRetryablePeerError(lastError)) {
+          clearTimeout(timer);
+          retryOrFail(lastError);
+          return;
+        }
+        settled = true;
+        if (hooks.onError) hooks.onError(lastError);
+      }
+
+      p.on('open', (openedId) => {
+        if (token !== sessionToken || settled) return;
+        opened = true;
+        clearTimeout(timer);
+        if (hooks.onOpen) hooks.onOpen(openedId, p, token);
+      });
+      p.on('error', (err) => {
+        if (!opened) handleOpenFailure(err);
+        else handlePostOpenProblem(err);
+      });
+      p.on('disconnected', () => {
+        const err = { type: 'network', message: 'PeerJS signaling disconnected' };
+        if (!opened) handleOpenFailure(err);
+        else handlePostOpenProblem(err);
+      });
+    };
+
+    launch();
+    return token;
   }
 
   function setupConn(c) {
@@ -121,10 +250,12 @@
       if (onMessageCb) onMessageCb(data);
     });
     conn.on('close', () => {
+      if (conn !== c) return;
       if (onClosedCb) onClosedCb('peer closed');
       teardown();
     });
     conn.on('error', (err) => {
+      if (conn !== c) return;
       lastError = err;
       if (onClosedCb) onClosedCb('error: ' + err.type);
       teardown();
@@ -174,27 +305,46 @@
     lastError = null;
     roomCode = (opts.code || generateCode()).toUpperCase();
     const id = ROOM_PREFIX + roomCode;
-    peer = ensurePeer(id);
-    peer.on('open', () => {
-      if (opts.onReady) opts.onReady(roomCode);
-    });
-    peer.on('connection', (c) => {
-      if (conn) {
-        c.close(); return; // только 1 клиент
+    openPeerWithRetry(
+      () => id,
+      {
+        onAttempt: (n, max) => {
+          if (opts.onAttempt) opts.onAttempt(n, max, lastError);
+        },
+        onRetry: (n, max, err) => {
+          if (opts.onRetry) opts.onRetry(n, max, err);
+        },
+        attach: (p, token) => {
+          p.on('connection', (c) => {
+            if (token !== sessionToken) {
+              c.close(); return;
+            }
+            if (conn) {
+              c.close(); return; // только 1 клиент
+            }
+            setupConn(c);
+            if (opts.onPending) opts.onPending();
+            waitForOpen(
+              c,
+              () => { if (onConnectedCb) onConnectedCb(); },
+              (err) => { if (opts.onError) opts.onError(err); }
+            );
+          });
+        },
+        onOpen: () => {
+          if (opts.onReady) opts.onReady(roomCode);
+        },
+        onError: (err) => {
+          lastError = normalizePeerError(err);
+          if (opts.onError) opts.onError(lastError);
+        },
       }
-      setupConn(c);
-      if (opts.onPending) opts.onPending();
-      waitForOpen(
-        c,
-        () => { if (onConnectedCb) onConnectedCb(); },
-        (err) => { if (opts.onError) opts.onError(err); }
-      );
-    });
-    peer.on('error', (err) => {
-      lastError = err;
-      if (opts.onError) opts.onError(err);
-    });
+    );
     return roomCode;
+  }
+
+  function makeClientId(code, attempt = 0) {
+    return ROOM_PREFIX + code + '-c-' + attempt + '-' + Math.random().toString(36).slice(2, 7);
   }
 
   function join(code, opts) {
@@ -206,24 +356,36 @@
     lastError = null;
     roomCode = code.toUpperCase();
     const targetId = ROOM_PREFIX + roomCode;
-    const myId = ROOM_PREFIX + roomCode + '-c-' + Math.random().toString(36).slice(2, 7);
-    peer = ensurePeer(myId);
-    peer.on('open', () => {
-      const c = peer.connect(targetId, { reliable: true });
-      setupConn(c);
-      waitForOpen(
-        c,
-        () => {
-          if (onConnectedCb) onConnectedCb();
-          if (opts.onReady) opts.onReady(roomCode);
+    openPeerWithRetry(
+      (attempt) => makeClientId(roomCode, attempt),
+      {
+        onAttempt: (n, max) => {
+          if (opts.onAttempt) opts.onAttempt(n, max, lastError);
         },
-        (err) => { if (opts.onError) opts.onError(err); }
-      );
-    });
-    peer.on('error', (err) => {
-      lastError = err;
-      if (opts.onError) opts.onError(err);
-    });
+        onRetry: (n, max, err) => {
+          if (opts.onRetry) opts.onRetry(n, max, err);
+        },
+        onOpen: () => {
+          const c = peer.connect(targetId, { reliable: true });
+          setupConn(c);
+          waitForOpen(
+            c,
+            () => {
+              if (onConnectedCb) onConnectedCb();
+              if (opts.onReady) opts.onReady(roomCode);
+            },
+            (err) => {
+              lastError = normalizePeerError(err, 'timeout');
+              if (opts.onError) opts.onError(lastError);
+            }
+          );
+        },
+        onError: (err) => {
+          lastError = normalizePeerError(err);
+          if (opts.onError) opts.onError(lastError);
+        },
+      }
+    );
   }
 
   function send(msg) {
@@ -237,13 +399,16 @@
   }
 
   function teardown() {
-    try { if (conn) conn.close(); } catch (e) {}
-    try { if (peer) peer.destroy(); } catch (e) {}
+    sessionToken++;
+    const oldConn = conn;
+    const oldPeer = peer;
     conn = null;
     peer = null;
     role = null;
     roomCode = null;
     connReady = false;
+    try { if (oldConn) oldConn.close(); } catch (e) {}
+    try { if (oldPeer) oldPeer.destroy(); } catch (e) {}
   }
 
   function disconnect() {

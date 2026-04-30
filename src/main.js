@@ -258,6 +258,16 @@
     }
   }
 
+  function describeNetError(err) {
+    const t = err && err.type ? String(err.type).toLowerCase() : String(err || '').toLowerCase();
+    if (t === 'peer-unavailable') return 'Комнаты с таким кодом нет';
+    if (t === 'timeout') return 'Не удалось открыть канал. Проверьте код и обновите обе страницы.';
+    if (t === 'network' || t === 'server-error' || t === 'socket-error' || t === 'socket-closed') {
+      return 'Ошибка сети PeerJS. Обновите страницу или попробуйте другой интернет.';
+    }
+    return 'Ошибка: ' + (t || err);
+  }
+
   function startHosting() {
     lobbyDisconnectMsg = '';
     lobbyStatus = 'Регистрация комнаты...';
@@ -277,10 +287,11 @@
       },
       onMessage: onNetMessage,
       onClose: onNetClose,
+      onRetry: (n, max) => {
+        lobbyStatus = 'PeerJS не ответил, повтор ' + n + '/' + max + '...';
+      },
       onError: (err) => {
-        const t = err && err.type ? err.type : '';
-        if (t === 'timeout') lobbyStatus = 'Не удалось открыть канал. Попробуйте обновить обе страницы.';
-        else lobbyStatus = 'Ошибка: ' + (t || err);
+        lobbyStatus = describeNetError(err);
       },
     });
   }
@@ -300,11 +311,11 @@
       },
       onMessage: onNetMessage,
       onClose: onNetClose,
+      onRetry: (n, max) => {
+        lobbyStatus = 'PeerJS не ответил, повтор ' + n + '/' + max + '...';
+      },
       onError: (err) => {
-        const t = err && err.type ? err.type : '';
-        if (t === 'peer-unavailable') lobbyStatus = 'Комнаты с таким кодом нет';
-        else if (t === 'timeout') lobbyStatus = 'Не удалось подключиться за 20 сек. Проверьте код и обновите страницу.';
-        else lobbyStatus = 'Ошибка: ' + (t || err);
+        lobbyStatus = describeNetError(err);
       },
     });
   }
