@@ -261,7 +261,7 @@
   function describeNetError(err) {
     const t = err && err.type ? String(err.type).toLowerCase() : String(err || '').toLowerCase();
     if (t === 'peer-unavailable') return 'Комнаты с таким кодом нет';
-    if (t === 'timeout') return 'Не удалось открыть канал. Проверьте код и обновите обе страницы.';
+    if (t === 'timeout') return 'WebRTC не нашёл маршрут. Нужен TURN, другая сеть или VPN.';
     if (t === 'signal-network') return 'Не удалось открыть сигнальный канал. Попробуйте другую сеть/VPN.';
     if (t === 'webrtc') return 'WebRTC-канал не открылся. Попробуйте другую сеть или VPN.';
     if (t === 'network' || t === 'server-error' || t === 'socket-error' || t === 'socket-closed') {
@@ -280,7 +280,7 @@
         lobbyStatus = 'Жду друга...';
       },
       onPending: () => {
-        lobbyStatus = 'Друг найден, открываем канал...';
+        lobbyStatus = 'Друг найден, строю WebRTC через STUN/TURN...';
       },
       onConnect: () => {
         // Клиент подключился — стартуем матч
@@ -309,7 +309,7 @@
     lobbyDisconnectMsg = '';
     lobbyStatus = 'Подключаюсь...';
     G.net.join(joinCodeBuffer, {
-      onReady: () => { lobbyStatus = 'Подключено, жду старта...'; },
+      onReady: () => { lobbyStatus = 'Сигнальный канал открыт, строю WebRTC...'; },
       onConnect: () => {
         G.net.send({ t: 'hello', v: G.net.PROTOCOL_VERSION });
         startMatch('net', { netRole: 'client' });
