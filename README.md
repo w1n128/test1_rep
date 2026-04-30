@@ -50,6 +50,8 @@ python3 -m http.server 8765
   `?turnHost=your-turn.example&turnUser=USER&turnCred=PASS&iceRelay=1`
 - Для Metered TURN обычно подходит:
   `?turnHost=global.relay.metered.ca&turnUser=USER&turnCred=PASS`
+- Для проверки бесплатного OpenRelay-пресета:
+  `?turnPreset=openrelay`
 
 ## Деплой на GitHub Pages
 

@@ -18,6 +18,10 @@
   const SIGNAL_PREFIX = 'svalkus-net-v2-';
   const RELAY_SNAP_MS = 110;
   const RELAY_INPUT_MS = 45;
+  const OPENRELAY_AUTH = {
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  };
 
   function generateCode(len = 6) {
     let s = '';
@@ -135,6 +139,18 @@
     }
 
     const turnUrls = qs.getAll('turnUrl').filter(Boolean);
+    const turnPreset = (qs.get('turnPreset') || qs.get('turn') || '').toLowerCase();
+    if (!turnUrls.length && turnPreset === 'openrelay') {
+      servers.push(
+        { urls: 'stun:openrelay.metered.ca:80' },
+        { urls: 'turn:openrelay.metered.ca:80', ...OPENRELAY_AUTH },
+        { urls: 'turn:openrelay.metered.ca:80?transport=tcp', ...OPENRELAY_AUTH },
+        { urls: 'turn:openrelay.metered.ca:443', ...OPENRELAY_AUTH },
+        { urls: 'turn:openrelay.metered.ca:443?transport=tcp', ...OPENRELAY_AUTH },
+        { urls: 'turns:openrelay.metered.ca:443?transport=tcp', ...OPENRELAY_AUTH },
+      );
+    }
+
     const turnHost = qs.get('turnHost');
     if (!turnUrls.length && turnHost) {
       const host = turnHost.replace(/^turns?:\/\//, '');
