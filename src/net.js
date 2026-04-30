@@ -1,5 +1,6 @@
 // Сетевой модуль: host-authoritative протокол.
-// По умолчанию данные идут через ntfy.sh relay; прямой WebRTC и PeerJS остались запасными режимами.
+// По умолчанию ntfy.sh используется только для signaling, а игровой канал идет через WebRTC + TURN.
+// PeerJS и ntfy relay остались запасными режимами.
 // Хост держит "истинное" состояние и шлёт снапшоты + события клиенту.
 // Клиент шлёт свой ввод хосту.
 (function () {
@@ -9,6 +10,7 @@
   const ROOM_PREFIX = 'tjvse-'; // префикс к коду чтобы не пересекаться с чужими peer-id
   const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // без 0/O/1/I/L
   const CONNECT_TIMEOUT_MS = 20000;
+  const RELAY_FALLBACK_TIMEOUT_MS = 10000;
   const PEER_OPEN_TIMEOUT_MS = 10000;
   const PEER_OPEN_ATTEMPTS = 3;
   const PEER_RETRY_DELAYS = [0, 900, 1800];
@@ -16,10 +18,6 @@
   const SIGNAL_PREFIX = 'svalkus-net-v2-';
   const RELAY_SNAP_MS = 110;
   const RELAY_INPUT_MS = 45;
-  const OPENRELAY_AUTH = {
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  };
 
   function generateCode(len = 6) {
     let s = '';
@@ -160,7 +158,11 @@
   function rtcConfig() {
     const custom = customIceServers();
     const qs = queryParams();
-    const relayOnly = qs.get('iceRelay') === '1' || qs.get('icePolicy') === 'relay';
+    const hasCustomTurn = custom.some((server) => {
+      const urls = Array.isArray(server.urls) ? server.urls : [server.urls];
+      return urls.some((url) => typeof url === 'string' && (url.indexOf('turn:') === 0 || url.indexOf('turns:') === 0));
+    });
+    const relayOnly = qs.get('iceRelay') === '1' || qs.get('icePolicy') === 'relay' || hasCustomTurn;
     return {
       iceTransportPolicy: relayOnly ? 'relay' : 'all',
       iceServers: [
@@ -169,28 +171,6 @@
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         { urls: 'stun:stun2.l.google.com:19302' },
-        { urls: 'stun:stun.relay.metered.ca:80' },
-        { urls: 'stun:openrelay.metered.ca:80' },
-        {
-          urls: 'turn:openrelay.metered.ca:80',
-          ...OPENRELAY_AUTH,
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:80?transport=tcp',
-          ...OPENRELAY_AUTH,
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:443',
-          ...OPENRELAY_AUTH,
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-          ...OPENRELAY_AUTH,
-        },
-        {
-          urls: 'turns:openrelay.metered.ca:443?transport=tcp',
-          ...OPENRELAY_AUTH,
-        },
       ],
     };
   }
@@ -355,9 +335,11 @@
   function preferDirectWebrtc() {
     try {
       const qs = queryParams();
-      return qs.get('netDirect') === '1' || qs.get('direct') === '1';
+      if (forceRelay()) return false;
+      if (qs.get('netDirect') === '0' || qs.get('direct') === '0') return false;
+      return true;
     } catch (e) {
-      return false;
+      return true;
     }
   }
 
@@ -600,11 +582,15 @@
     rawCandidateQueue = [];
     const token = ++sessionToken;
     let timeout = null;
+    let relayFallbackStarted = false;
     const fail = () => {
       if (connReady || token !== sessionToken) return;
-      if (remoteSignalId) {
-        publishSignal({ type: 'relay-ready', to: remoteSignalId }).catch(() => {});
-        if (setupRelayChannel(remoteSignalId)) return;
+      if (remoteSignalId && !relayFallbackStarted && !forceRelay()) {
+        relayFallbackStarted = true;
+        startRelayHost(remoteSignalId);
+        if (opts.onFallback) opts.onFallback();
+        timeout = setTimeout(fail, RELAY_FALLBACK_TIMEOUT_MS);
+        return;
       }
       lastError = { type: 'timeout' };
       if (opts.onError) opts.onError(lastError);
@@ -619,6 +605,7 @@
           if (opts.onPending) opts.onPending();
           if (forceRelay() || !preferDirectWebrtc()) {
             startRelayHost(remoteSignalId);
+            timeout = setTimeout(fail, CONNECT_TIMEOUT_MS);
             return;
           }
           timeout = setTimeout(fail, CONNECT_TIMEOUT_MS);
@@ -668,10 +655,16 @@
     const token = ++sessionToken;
     let joined = false;
     let timeout = null;
+    let relayFallbackWait = false;
     if (opts.onAttempt) opts.onAttempt(1, 1, null);
     const fail = () => {
       if (connReady || token !== sessionToken) return;
-      if (remoteSignalId && remoteSignalId !== 'host' && setupRelayChannel(remoteSignalId)) return;
+      if (remoteSignalId && remoteSignalId !== 'host' && !relayFallbackWait && !forceRelay()) {
+        relayFallbackWait = true;
+        if (opts.onFallback) opts.onFallback();
+        timeout = setTimeout(fail, RELAY_FALLBACK_TIMEOUT_MS);
+        return;
+      }
       lastError = { type: 'timeout' };
       if (opts.onError) opts.onError(lastError);
     };
