@@ -37,7 +37,7 @@
     NOVICE_ITEM_TYPES: ['mousetrap', 'firecracker', 'banana', 'branch'],
     NOVICE_SPEED_MUL: 0.7,
     POWERUP_TYPES: ['star', 'broom', 'boombox'],
-    POWERUP_WEIGHTS: { star: 1, broom: 2, boombox: 2 },
+    POWERUP_WEIGHTS: { star: 3, broom: 5, boombox: 2 },
     BAIT_TYPES: ['pizza', 'diamond'],
     POWERUP_SPAWN_CHANCE: 0.125,   // star как раньше, broom/boombox в 2 раза чаще
     BAIT_PULL_DURATION: 2.8,
@@ -53,7 +53,7 @@
     LAST_CHANCE_SPEED_MUL: 1.15,
     PREGAME_RULES_DURATION: 5.0,    // экран кратких правил перед стартом
     NIGHT_DAY_DURATION: 90.0,       // сколько длится день перед ночью
-    NIGHT_DURATION: 60.0,           // длительность ночи
+    NIGHT_DURATION: 30.0,           // длительность ночи
     FLASHLIGHT_TILES: 3,            // дальность фонарика в тайлах
     STAR_DURATION: 10.0,           // секунды бессмертия
     STAR_SPEED_MUL: 2.0,           // множитель скорости

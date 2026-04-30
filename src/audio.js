@@ -181,6 +181,23 @@
     o.stop(t0 + dur + 0.02);
   }
 
+  function starSparkle(freq, when = 0, vol = 0.065) {
+    tone(freq, 0.080, 'triangle', vol, when, null, 'music');
+    tone(freq * 2, 0.060, 'sine', vol * 0.55, when + 0.018, null, 'music');
+    filteredNoise(0.030, 0.018, 8200, when + 0.012, 'music', 'highpass', 0.8);
+  }
+
+  function starKick(when = 0) {
+    tone(180, 0.070, 'sine', 0.22, when, 92, 'music');
+    tone(96, 0.095, 'triangle', 0.10, when + 0.020, 72, 'music');
+  }
+
+  function starClap(when = 0) {
+    filteredNoise(0.050, 0.13, 2600, when, 'music', 'bandpass', 1.5);
+    filteredNoise(0.024, 0.055, 7600, when + 0.018, 'music', 'highpass', 0.8);
+    tone(620, 0.045, 'triangle', 0.055, when, 420, 'music');
+  }
+
   // Кулдауны чтобы не превратить интенсивные SFX в шум.
   const cooldowns = {};
   function canPlay(name, ms) {
@@ -436,7 +453,7 @@
     C3:130.81, D3:146.83, E3:164.81, F3:174.61, G3:196.00, A3:220.00, B3:246.94,
     C4:261.63, D4:293.66, E4:329.63, F4:349.23, G4:392.00, A4:440.00, B4:493.88,
     C5:523.25, D5:587.33, E5:659.25, F5:698.46, G5:783.99, A5:880.00, B5:987.77,
-    C6:1046.50, D6:1174.66, E6:1318.51,
+    C6:1046.50, D6:1174.66, E6:1318.51, F6:1396.91, G6:1567.98, A6:1760.00,
   };
   function n(name) { return NOTE[name]; }
 
@@ -510,6 +527,29 @@
     },
   ];
 
+  const STAR_PATTERNS = [
+    {
+      bass: ['C3', null, 'G3', null, 'E3', null, 'G3', null,
+             'A3', null, 'E3', null, 'F3', null, 'G3', null],
+      lead: ['C6', 'E6', 'G6', 'E6', 'C6', 'G5', 'E5', 'G5',
+             'A5', 'C6', 'E6', 'C6', 'A5', 'G5', 'E5', 'C5'],
+      sparkle: [1,0,1,0, 1,0,0,1, 1,0,1,0, 1,0,1,1],
+      hat:     [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+      clap:    [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1],
+      kick:    [1,0,0,0, 1,0,1,0, 1,0,0,0, 1,0,1,0],
+    },
+    {
+      bass: ['F3', null, 'A3', null, 'C4', null, 'A3', null,
+             'G3', null, 'B3', null, 'D4', null, 'B3', null],
+      lead: ['F5', 'A5', 'C6', 'F6', 'E6', 'C6', 'A5', 'F5',
+             'G5', 'B5', 'D6', 'G6', 'F6', 'D6', 'B5', 'G5'],
+      sparkle: [1,1,0,1, 1,0,1,0, 1,1,0,1, 1,0,1,1],
+      hat:     [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+      clap:    [0,0,0,0, 1,0,0,1, 0,0,0,0, 1,0,0,1],
+      kick:    [1,0,1,0, 1,0,0,0, 1,0,1,0, 1,0,0,1],
+    },
+  ];
+
   const MENU_PATTERNS = [
     {
       bass:  ['C3', null, null, null, 'G3', null, null, null, 'A3', null, null, null, 'F3', null, null, null],
@@ -526,6 +566,7 @@
   const TEMPO_BPM = 152;
   const TEMPO_DISCO_BPM = 124;
   const TEMPO_MENU_BPM = 86;
+  const TEMPO_STAR_BPM = 188;
   let STEP_SEC = 60 / TEMPO_BPM / 4; // 16-я нота — пересчитываем при смене режима
   const PATTERN_LEN = 16;
   let mode = 'chase'; // 'chase' | 'disco' | 'menu'
@@ -538,12 +579,31 @@
   let scheduledUpTo = 0;
 
   function refreshStepSec() {
-    const bpm = mode === 'menu' ? TEMPO_MENU_BPM : mode === 'disco' ? TEMPO_DISCO_BPM : TEMPO_BPM;
-    const mul = starBoost && window.G && window.G.config ? window.G.config.STAR_MUSIC_SPEED_MUL : 1;
+    const bpm = starBoost ? TEMPO_STAR_BPM : mode === 'menu' ? TEMPO_MENU_BPM : mode === 'disco' ? TEMPO_DISCO_BPM : TEMPO_BPM;
+    const mul = starBoost && window.G && window.G.config ? Math.min(1.05, window.G.config.STAR_MUSIC_SPEED_MUL) : 1;
     STEP_SEC = 60 / (bpm * mul) / 4;
   }
 
   function playStep(patternIdx, step, when) {
+    if (starBoost) {
+      const p = STAR_PATTERNS[patternIdx % STAR_PATTERNS.length];
+      if (p.kick[step]) starKick(when);
+      if (p.bass[step]) {
+        pluck(n(p.bass[step]), 0.18, 0.17, when, 'music');
+        tone(n(p.bass[step]) * 2, 0.08, 'triangle', 0.045, when + 0.018, null, 'music');
+      }
+      if (p.lead[step]) {
+        tone(n(p.lead[step]), 0.105, 'square', 0.085, when, null, 'music');
+        tone(n(p.lead[step]) * 1.5, 0.060, 'triangle', 0.030, when + 0.020, null, 'music');
+      }
+      if (p.sparkle[step]) starSparkle(n(p.lead[step] || 'C6'), when + 0.030, 0.050);
+      if (p.hat[step]) {
+        filteredNoise(0.018, 0.026, 9000, when, 'music', 'highpass', 0.7);
+      }
+      if (p.clap[step]) starClap(when);
+      return;
+    }
+
     const patterns = mode === 'menu' ? MENU_PATTERNS : mode === 'disco' ? DISCO_PATTERNS : PATTERNS;
     const p = patterns[patternIdx % patterns.length];
     if (mode === 'menu') {
