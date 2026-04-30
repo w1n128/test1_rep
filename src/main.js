@@ -279,10 +279,9 @@
 
   function startHosting() {
     lobbyDisconnectMsg = '';
-    lobbyCode = '';
     lobbyStatus = 'Регистрация комнаты...';
     state = STATE.NET_LOBBY_HOST;
-    const code = G.net.host({
+    G.net.host({
       onReady: (code) => {
         lobbyCode = code;
         lobbyStatus = 'Жду друга...';
@@ -310,10 +309,6 @@
         lobbyStatus = describeNetError(err);
       },
     });
-    if (code) {
-      lobbyCode = code;
-      lobbyStatus = 'Открываю сигнальный канал...';
-    }
   }
 
   function startJoining() {

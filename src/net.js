@@ -139,16 +139,11 @@
     const turnHost = qs.get('turnHost');
     if (!turnUrls.length && turnHost) {
       const host = turnHost.replace(/^turns?:\/\//, '');
-      const hasPort = /:\d+($|\?)/.test(host);
-      if (hasPort) {
-        turnUrls.push((turnHost.indexOf('turn:') === 0 || turnHost.indexOf('turns:') === 0) ? turnHost : 'turn:' + host);
-      } else {
-        turnUrls.push('turn:' + host + ':80');
-        turnUrls.push('turn:' + host + ':80?transport=tcp');
-        turnUrls.push('turn:' + host + ':443');
-        turnUrls.push('turn:' + host + ':443?transport=tcp');
-        turnUrls.push('turns:' + host + ':443?transport=tcp');
-      }
+      turnUrls.push('turn:' + host + ':80');
+      turnUrls.push('turn:' + host + ':80?transport=tcp');
+      turnUrls.push('turn:' + host + ':443');
+      turnUrls.push('turn:' + host + ':443?transport=tcp');
+      turnUrls.push('turns:' + host + ':443?transport=tcp');
     }
     if (turnUrls.length) {
       const turn = { urls: turnUrls };
