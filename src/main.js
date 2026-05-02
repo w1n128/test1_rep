@@ -77,7 +77,7 @@
   let netRole = null; // 'host' | 'client'
   let netInputDevice = null;
   let menuChoice = 0;       // 0..2
-  let settingsChoice = 0;   // 0=speed, 1=net controls
+  let settingsChoice = 0;   // 0=speed, 1=controls
   let netMenuChoice = 0;    // 0=host, 1=join
   let joinCodeBuffer = '';  // ввод кода для подключения
   let lobbyCode = '';       // код, который видит хост
@@ -100,7 +100,7 @@
   const ITEM_SELECT_ACTIONS = Array.from({ length: 10 }, (_, i) => 'select' + i);
   const settings = {
     gameSpeed: 1,
-    netControls: 'classic',
+    controls: 'classic',
   };
 
   function loadSettings() {
@@ -109,7 +109,8 @@
       if (!raw) return;
       const parsed = JSON.parse(raw);
       if (parsed.gameSpeed === 0.5 || parsed.gameSpeed === 1) settings.gameSpeed = parsed.gameSpeed;
-      if (parsed.netControls === 'classic' || parsed.netControls === 'alt') settings.netControls = parsed.netControls;
+      const storedControls = parsed.controls || parsed.netControls;
+      if (storedControls === 'classic' || storedControls === 'alt') settings.controls = storedControls;
     } catch (e) {}
   }
 
@@ -126,15 +127,15 @@
     return settings.gameSpeed;
   }
 
-  function netLocalInput() {
-    return settings.netControls === 'alt' && G.input.netAlt ? G.input.netAlt : G.input.p1;
+  function primaryInput() {
+    return settings.controls === 'alt' && G.input.netAlt ? G.input.netAlt : G.input.p1;
   }
 
   function toggleSettingsOption() {
     if (settingsChoice === 0) {
       settings.gameSpeed = settings.gameSpeed === 1 ? 0.5 : 1;
     } else {
-      settings.netControls = settings.netControls === 'classic' ? 'alt' : 'classic';
+      settings.controls = settings.controls === 'classic' ? 'alt' : 'classic';
     }
     saveSettings();
   }
@@ -164,15 +165,15 @@
       // Клиент — управляет p2 (Енот) локально, p1 — по сети (но он не симулирует физику).
       netInputDevice = new G.net.NetInputDevice('remote');
       if (netRole === 'host') {
-        p1Input = netLocalInput();
+        p1Input = primaryInput();
         p2Input = netInputDevice;
       } else {
         p1Input = netInputDevice;
-        p2Input = netLocalInput(); // клиент использует выбранную локальную сетевую схему
+        p2Input = primaryInput(); // клиент использует выбранную локальную схему
       }
       ai = null;
     } else if (mode === 'cpu') {
-      p1Input = G.input.p1;
+      p1Input = primaryInput();
       ai = new G.AIController();
       p2Input = ai;
     } else {
@@ -527,7 +528,7 @@
         for (const pk of (pickupManager ? pickupManager.list : [])) pk.animT += simDt;
 
         // Собрать ввод и отправить хосту (только при изменении или каждые ~3 кадра)
-        const local = netLocalInput();
+        const local = primaryInput();
         const actions = {
           up: local.isDown('up'), down: local.isDown('down'),
           left: local.isDown('left'), right: local.isDown('right'),
@@ -772,9 +773,11 @@
     ctx.font = '12px monospace';
     ctx.fillStyle = '#9c9';
     ctx.textAlign = 'center';
-    ctx.fillText('Управление 1: WASD движение, F использовать, Q/E переключить', cx, 486);
+    ctx.fillText(settings.controls === 'alt'
+      ? '1P/сеть: стрелки движение, E использовать, 1-9 выбрать предмет'
+      : '1P/сеть: WASD движение, F использовать, Q/E переключить', cx, 486);
     ctx.fillStyle = '#9cc';
-    ctx.fillText('Управление 2: стрелки, «.» использовать, / вперёд, «,» назад', cx, 504);
+    ctx.fillText('Hot Seat: дворник WASD/F/Q/E, енот стрелки, «.», «,», «/»', cx, 504);
     ctx.fillStyle = '#ccc';
     ctx.fillText('Enter / 1 / 2 / 3 / 4 / 5 — выбор.  Esc — пауза.  M — в меню.', cx, 536);
   }
@@ -795,7 +798,7 @@
 
     const rows = [
       ['Скорость игры', settings.gameSpeed === 1 ? '1x' : '0.5x'],
-      ['Управление по сети', settings.netControls === 'classic' ? 'WASD / F / Q/E' : 'Стрелки / E / 1-9'],
+      ['Управление 1P/сеть', settings.controls === 'classic' ? 'WASD / F / Q/E' : 'Стрелки / E / 1-9'],
     ];
     for (let i = 0; i < rows.length; i++) {
       const y = 210 + i * 72;
@@ -811,6 +814,8 @@
     ctx.fillStyle = '#9c9';
     ctx.font = '12px monospace';
     ctx.fillText('Стрелки/W/S — выбрать, Enter/F/←/→ — изменить, Esc — назад', cx, 480);
+    ctx.fillStyle = '#9cc';
+    ctx.fillText('Hot Seat всегда использует две отдельные схемы: WASD и стрелки.', cx, 506);
   }
 
   function drawMenuChase(cx, y) {
@@ -1009,18 +1014,18 @@
     ctx.fillStyle = '#ffe060';
     ctx.fillText(String(count), cx, 100);
 
-    const netActionLine = settings.netControls === 'alt'
+    const primaryActionLine = settings.controls === 'alt'
       ? 'Стрелки — движение, E — использовать, 1-9 — выбрать предмет.'
       : 'F — использовать предмет. Shift — рывок с перезарядкой.';
     const lines = noviceMode ? [
       'Цель: первым выбить сопернику все 5 жизней.',
-      'F — использовать выбранный предмет, Q/E — переключать инвентарь.',
+      primaryActionLine,
       'Доступны только мышеловка, банан, петарда и ветка.',
       'Ночи, случайных событий, рывка, звезды, метлы и магнитофона здесь нет.',
       'Скорость персонажей снижена на 30%, чтобы спокойно освоиться.',
     ] : [
       'Цель: первым выбить сопернику все 5 жизней.',
-      mode === 'net' ? netActionLine : 'F — использовать предмет. Shift — рывок с перезарядкой.',
+      mode === 'pvp' ? 'F — использовать предмет. Shift — рывок с перезарядкой.' : primaryActionLine,
       'Ветка бьёт на 1 клетку, банка летит по направлению взгляда.',
       'Ловушки, банан, петарды и люки помогают догнать или остановить соперника.',
       'Через 90 секунд наступает ночь: предметы и соперник видны только в луче фонарика.',
@@ -1135,11 +1140,17 @@
     ctx.fillStyle = '#9c9';
     const baseY = startY + rules.length * rowH + 14;
     if (mode === 'net') {
-      ctx.fillText(settings.netControls === 'alt'
+      ctx.fillText(settings.controls === 'alt'
         ? 'Сеть: стрелки движение, E использовать, 1-9 выбрать предмет, Right Shift рывок'
         : 'Сеть: WASD движение, Shift рывок, F использовать, Q/E переключить', cx, baseY);
       ctx.fillStyle = '#9cc';
       ctx.fillText('Скорость матча задаётся хостом в параметрах главного меню.', cx, baseY + 18);
+    } else if (mode === 'cpu') {
+      ctx.fillText(settings.controls === 'alt'
+        ? 'Управление 1: стрелки движение, Right Shift рывок, E использовать, 1-9 выбрать'
+        : 'Управление 1: WASD движение, Shift рывок, F использовать, Q/E переключить', cx, baseY);
+      ctx.fillStyle = '#9cc';
+      ctx.fillText('Hot Seat использует отдельное управление для двух игроков.', cx, baseY + 18);
     } else {
       ctx.fillText(noviceMode
         ? 'Управление 1 (Дворник): WASD движение, F использовать, Q/E переключить'
