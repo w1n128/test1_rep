@@ -32,6 +32,12 @@
     ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
     Period: 'place', Comma: 'switchPrev', Slash: 'switchNext', ShiftRight: 'dash',
   });
+  const netAlt = new InputDevice('netAlt', {
+    ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+    KeyE: 'place', ShiftRight: 'dash',
+    Digit1: 'select0', Digit2: 'select1', Digit3: 'select2', Digit4: 'select3', Digit5: 'select4',
+    Digit6: 'select5', Digit7: 'select6', Digit8: 'select7', Digit9: 'select8', Digit0: 'select9',
+  });
 
   // Глобальное меню/системные команды.
   const sys = new InputDevice('sys', {
@@ -40,6 +46,7 @@
     Digit2: 'mode2',
     Digit3: 'mode3',
     Digit4: 'mode4',
+    Digit5: 'mode5',
     Escape: 'pause',
     KeyR: 'restart',
     KeyM: 'menu',
@@ -50,6 +57,7 @@
   const ALL_KEYS = new Set([
     ...Object.keys(p1.map),
     ...Object.keys(p2.map),
+    ...Object.keys(netAlt.map),
     ...Object.keys(sys.map),
   ]);
 
@@ -61,22 +69,25 @@
     anyKeyJustPressed = true;
     if (p1.map[e.code])  p1.setAction(p1.map[e.code], true);
     if (p2.map[e.code])  p2.setAction(p2.map[e.code], true);
+    if (netAlt.map[e.code]) netAlt.setAction(netAlt.map[e.code], true);
     if (sys.map[e.code]) sys.setAction(sys.map[e.code], true);
   });
 
   window.addEventListener('keyup', (e) => {
     if (p1.map[e.code])  p1.setAction(p1.map[e.code], false);
     if (p2.map[e.code])  p2.setAction(p2.map[e.code], false);
+    if (netAlt.map[e.code]) netAlt.setAction(netAlt.map[e.code], false);
     if (sys.map[e.code]) sys.setAction(sys.map[e.code], false);
   });
 
   G.InputDevice = InputDevice;
   G.input = {
-    p1, p2, sys,
+    p1, p2, netAlt, sys,
     anyKeyJustPressed: () => anyKeyJustPressed,
     consumeAll() {
       p1.consume();
       p2.consume();
+      netAlt.consume();
       sys.consume();
       anyKeyJustPressed = false;
     },

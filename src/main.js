@@ -13,7 +13,7 @@
   function initAudioOnce() {
     if (G.audio) {
       G.audio.init();
-      if (G.audio.music && (state === STATE.MENU || state === STATE.MENU_NET || state === STATE.NET_LOBBY_HOST || state === STATE.NET_LOBBY_JOIN)) {
+      if (G.audio.music && (state === STATE.MENU || state === STATE.SETTINGS || state === STATE.MENU_NET || state === STATE.NET_LOBBY_HOST || state === STATE.NET_LOBBY_JOIN)) {
         G.audio.music.start('menu');
       }
     }
@@ -63,6 +63,7 @@
 
   const STATE = {
     MENU: 'menu',
+    SETTINGS: 'settings',
     MENU_NET: 'menu_net',
     NET_LOBBY_HOST: 'net_lobby_host',
     NET_LOBBY_JOIN: 'net_lobby_join',
@@ -76,6 +77,7 @@
   let netRole = null; // 'host' | 'client'
   let netInputDevice = null;
   let menuChoice = 0;       // 0..2
+  let settingsChoice = 0;   // 0=speed, 1=net controls
   let netMenuChoice = 0;    // 0=host, 1=join
   let joinCodeBuffer = '';  // ввод кода для подключения
   let lobbyCode = '';       // код, который видит хост
@@ -92,7 +94,50 @@
   let matchTime = 0;
   let introT = 0;
   let noviceMode = false;
+  let remoteGameSpeed = 1;
   G.match = { novice: false };
+  const SETTINGS_KEY = 'svalkus_settings_v1';
+  const ITEM_SELECT_ACTIONS = Array.from({ length: 10 }, (_, i) => 'select' + i);
+  const settings = {
+    gameSpeed: 1,
+    netControls: 'classic',
+  };
+
+  function loadSettings() {
+    try {
+      const raw = window.localStorage && window.localStorage.getItem(SETTINGS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed.gameSpeed === 0.5 || parsed.gameSpeed === 1) settings.gameSpeed = parsed.gameSpeed;
+      if (parsed.netControls === 'classic' || parsed.netControls === 'alt') settings.netControls = parsed.netControls;
+    } catch (e) {}
+  }
+
+  function saveSettings() {
+    try {
+      if (window.localStorage) window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    } catch (e) {}
+  }
+
+  loadSettings();
+
+  function currentGameSpeed() {
+    if (mode === 'net' && netRole === 'client') return remoteGameSpeed || 1;
+    return settings.gameSpeed;
+  }
+
+  function netLocalInput() {
+    return settings.netControls === 'alt' && G.input.netAlt ? G.input.netAlt : G.input.p1;
+  }
+
+  function toggleSettingsOption() {
+    if (settingsChoice === 0) {
+      settings.gameSpeed = settings.gameSpeed === 1 ? 0.5 : 1;
+    } else {
+      settings.netControls = settings.netControls === 'classic' ? 'alt' : 'classic';
+    }
+    saveSettings();
+  }
 
   function syncReactiveMusic() {
     if (!G.audio || !G.audio.music || !players.length) return;
@@ -107,6 +152,7 @@
     noviceMode = !!opts.novice && mode !== 'net';
     G.match = { novice: noviceMode };
     netRole = opts.netRole || null;
+    remoteGameSpeed = settings.gameSpeed;
     netInputDevice = null;
     trapManager = new G.TrapManager();
     pickupManager = new G.PickupManager();
@@ -118,11 +164,11 @@
       // Клиент — управляет p2 (Енот) локально, p1 — по сети (но он не симулирует физику).
       netInputDevice = new G.net.NetInputDevice('remote');
       if (netRole === 'host') {
-        p1Input = G.input.p1;
+        p1Input = netLocalInput();
         p2Input = netInputDevice;
       } else {
         p1Input = netInputDevice;
-        p2Input = G.input.p1; // клиент использует свою локальную WASD-схему
+        p2Input = netLocalInput(); // клиент использует выбранную локальную сетевую схему
       }
       ai = null;
     } else if (mode === 'cpu') {
@@ -180,6 +226,7 @@
     netRole = null;
     netInputDevice = null;
     noviceMode = false;
+    remoteGameSpeed = settings.gameSpeed;
     G.match = { novice: false };
     G.trapManager = null;
     G.pickupManager = null;
@@ -213,6 +260,7 @@
       if (msg.ev && G.net && G.net.applyEvents) G.net.applyEvents(msg.ev);
       if (typeof msg.time === 'number') time = msg.time;
       if (typeof msg.matchTime === 'number') matchTime = msg.matchTime;
+      if (typeof msg.speed === 'number') remoteGameSpeed = msg.speed;
       syncReactiveMusic();
       return;
     }
@@ -366,11 +414,12 @@
     time += dt;
 
     if (state === STATE.MENU) {
-      const total = 4;
+      const total = 5;
       if (G.input.sys.wasPressed('mode1')) { startMatch('cpu'); return; }
       if (G.input.sys.wasPressed('mode2')) { startMatch('pvp'); return; }
       if (G.input.sys.wasPressed('mode3')) { state = STATE.MENU_NET; netMenuChoice = 0; return; }
       if (G.input.sys.wasPressed('mode4')) { startMatch('cpu', { novice: true }); return; }
+      if (G.input.sys.wasPressed('mode5')) { state = STATE.SETTINGS; settingsChoice = 0; return; }
       if (G.input.p1.wasPressed('up') || G.input.p2.wasPressed('up')) {
         menuChoice = (menuChoice - 1 + total) % total;
       }
@@ -381,7 +430,27 @@
         if (menuChoice === 0) startMatch('cpu');
         else if (menuChoice === 1) startMatch('pvp');
         else if (menuChoice === 2) { state = STATE.MENU_NET; netMenuChoice = 0; }
-        else startMatch('cpu', { novice: true });
+        else if (menuChoice === 3) startMatch('cpu', { novice: true });
+        else { state = STATE.SETTINGS; settingsChoice = 0; }
+      }
+      return;
+    }
+
+    if (state === STATE.SETTINGS) {
+      if (G.input.sys.wasPressed('menu') || G.input.sys.wasPressed('pause')) {
+        state = STATE.MENU; return;
+      }
+      if (G.input.p1.wasPressed('up') || G.input.p2.wasPressed('up')) {
+        settingsChoice = (settingsChoice + 1) % 2;
+      }
+      if (G.input.p1.wasPressed('down') || G.input.p2.wasPressed('down')) {
+        settingsChoice = (settingsChoice + 1) % 2;
+      }
+      if (G.input.p1.wasPressed('left') || G.input.p1.wasPressed('right') ||
+          G.input.p2.wasPressed('left') || G.input.p2.wasPressed('right') ||
+          G.input.sys.wasPressed('confirm') ||
+          G.input.p1.wasPressed('place') || G.input.p2.wasPressed('place')) {
+        toggleSettingsOption();
       }
       return;
     }
@@ -450,14 +519,15 @@
         }
       }
       if (G.input.sys.wasPressed('menu'))  { returnToMenu(); return; }
+      const simDt = dt * currentGameSpeed();
       if (mode === 'net' && netRole === 'client') {
         // Клиент: только косметика и пересылка ввода
-        if (G.particles) G.particles.update(dt);
-        if (G.render && G.render.updateShake) G.render.updateShake(dt);
-        for (const pk of (pickupManager ? pickupManager.list : [])) pk.animT += dt;
+        if (G.particles) G.particles.update(simDt);
+        if (G.render && G.render.updateShake) G.render.updateShake(simDt);
+        for (const pk of (pickupManager ? pickupManager.list : [])) pk.animT += simDt;
 
         // Собрать ввод и отправить хосту (только при изменении или каждые ~3 кадра)
-        const local = G.input.p1;
+        const local = netLocalInput();
         const actions = {
           up: local.isDown('up'), down: local.isDown('down'),
           left: local.isDown('left'), right: local.isDown('right'),
@@ -467,7 +537,7 @@
           switchPrev: local.isDown('switchPrev'),
         };
         const justPressed = [];
-        for (const a of ['place', 'dash', 'switchNext', 'switchPrev']) {
+        for (const a of ['place', 'dash', 'switchNext', 'switchPrev', ...ITEM_SELECT_ACTIONS]) {
           if (local.wasPressed(a)) justPressed.push(a);
         }
         G.net.send({ t: 'input', actions, justPressed });
@@ -475,9 +545,9 @@
       }
 
       // Хост (или локальные режимы) — обычный tick
-      matchTime += dt;
-      if (ai) ai.update(dt);
-      for (const p of players) p.update(dt, trapManager);
+      matchTime += simDt;
+      if (ai) ai.update(simDt);
+      for (const p of players) p.update(simDt, trapManager);
       // На хосте: после player.update нужно сбросить justPressed у NetInputDevice,
       // иначе клиентское нажатие будет повторяться каждый тик.
       if (netInputDevice && netInputDevice.consume) netInputDevice.consume();
@@ -504,11 +574,11 @@
         }
       }
 
-      trapManager.update(dt);
-      pickupManager.update(dt);
-      if (arenaEventManager) arenaEventManager.update(dt, players, trapManager, pickupManager);
-      if (G.particles) G.particles.update(dt);
-      if (G.render && G.render.updateShake) G.render.updateShake(dt);
+      trapManager.update(simDt);
+      pickupManager.update(simDt);
+      if (arenaEventManager) arenaEventManager.update(simDt, players, trapManager, pickupManager);
+      if (G.particles) G.particles.update(simDt);
+      if (G.render && G.render.updateShake) G.render.updateShake(simDt);
       syncReactiveMusic();
 
       // Хост шлёт снапшот каждый тик (60Hz) — для плавной анимации клиента
@@ -517,6 +587,7 @@
           t: 'snap',
           time,
           matchTime,
+          speed: currentGameSpeed(),
           p: players.map(p => p.serialize()),
           tr: trapManager.serialize(),
           pk: pickupManager.serialize(),
@@ -574,6 +645,8 @@
 
     if (state === STATE.MENU) {
       drawMenu();
+    } else if (state === STATE.SETTINGS) {
+      drawSettingsMenu();
     } else if (state === STATE.MENU_NET) {
       drawNetSubmenu();
     } else if (state === STATE.NET_LOBBY_HOST) {
@@ -681,9 +754,10 @@
       ['2', '2P Hot Seat', '— два игрока за одной клавиатурой'],
       ['3', 'По сети', '— игра с другом через интернет'],
       ['4', 'Режим новичка', '— спокойный 1P: меньше предметов и скорость ниже'],
+      ['5', 'Параметры', '— скорость игры и сетевое управление'],
     ];
     for (let i = 0; i < opts.length; i++) {
-      const y = 314 + i * 38;
+      const y = 300 + i * 34;
       const sel = menuChoice === i;
       ctx.fillStyle = sel ? '#fff060' : '#888';
       ctx.font = 'bold 18px monospace';
@@ -702,7 +776,41 @@
     ctx.fillStyle = '#9cc';
     ctx.fillText('Управление 2: стрелки, «.» использовать, / вперёд, «,» назад', cx, 504);
     ctx.fillStyle = '#ccc';
-    ctx.fillText('Enter / 1 / 2 / 3 / 4 — старт.  Esc — пауза.  M — в меню.', cx, 536);
+    ctx.fillText('Enter / 1 / 2 / 3 / 4 / 5 — выбор.  Esc — пауза.  M — в меню.', cx, 536);
+  }
+
+  function drawSettingsMenu() {
+    ctx.fillStyle = '#244';
+    ctx.fillRect(0, 0, C.CANVAS_W, C.CANVAS_H);
+
+    const cx = C.CANVAS_W / 2;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+
+    ctx.fillStyle = '#222';
+    ctx.font = 'bold 36px monospace';
+    ctx.fillText('ПАРАМЕТРЫ', cx + 2, 80);
+    ctx.fillStyle = '#fff060';
+    ctx.fillText('ПАРАМЕТРЫ', cx, 78);
+
+    const rows = [
+      ['Скорость игры', settings.gameSpeed === 1 ? '1x' : '0.5x'],
+      ['Управление по сети', settings.netControls === 'classic' ? 'WASD / F / Q/E' : 'Стрелки / E / 1-9'],
+    ];
+    for (let i = 0; i < rows.length; i++) {
+      const y = 210 + i * 72;
+      const sel = settingsChoice === i;
+      ctx.fillStyle = sel ? '#fff060' : '#888';
+      ctx.font = 'bold 22px monospace';
+      ctx.fillText((sel ? '> ' : '  ') + rows[i][0], cx, y);
+      ctx.fillStyle = sel ? '#fff' : '#aaa';
+      ctx.font = 'bold 20px monospace';
+      ctx.fillText(rows[i][1], cx, y + 30);
+    }
+
+    ctx.fillStyle = '#9c9';
+    ctx.font = '12px monospace';
+    ctx.fillText('Стрелки/W/S — выбрать, Enter/F/←/→ — изменить, Esc — назад', cx, 480);
   }
 
   function drawMenuChase(cx, y) {
@@ -901,6 +1009,9 @@
     ctx.fillStyle = '#ffe060';
     ctx.fillText(String(count), cx, 100);
 
+    const netActionLine = settings.netControls === 'alt'
+      ? 'Стрелки — движение, E — использовать, 1-9 — выбрать предмет.'
+      : 'F — использовать предмет. Shift — рывок с перезарядкой.';
     const lines = noviceMode ? [
       'Цель: первым выбить сопернику все 5 жизней.',
       'F — использовать выбранный предмет, Q/E — переключать инвентарь.',
@@ -909,7 +1020,7 @@
       'Скорость персонажей снижена на 30%, чтобы спокойно освоиться.',
     ] : [
       'Цель: первым выбить сопернику все 5 жизней.',
-      'F — использовать предмет. Shift — рывок с перезарядкой.',
+      mode === 'net' ? netActionLine : 'F — использовать предмет. Shift — рывок с перезарядкой.',
       'Ветка бьёт на 1 клетку, банка летит по направлению взгляда.',
       'Ловушки, банан, петарды и люки помогают догнать или остановить соперника.',
       'Через 90 секунд наступает ночь: предметы и соперник видны только в луче фонарика.',
@@ -1023,13 +1134,21 @@
     ctx.font = '12px monospace';
     ctx.fillStyle = '#9c9';
     const baseY = startY + rules.length * rowH + 14;
-    ctx.fillText(noviceMode
-      ? 'Управление 1 (Дворник): WASD движение, F использовать, Q/E переключить'
-      : 'Управление 1 (Дворник): WASD движение, Shift рывок, F использовать, Q/E переключить', cx, baseY);
-    ctx.fillStyle = '#9cc';
-    ctx.fillText(noviceMode
-      ? 'Управление 2 (Енот): стрелки, «.» использовать, / вперёд, «,» назад'
-      : 'Управление 2 (Енот): стрелки, Right Shift рывок, «.» использовать, / вперёд, «,» назад', cx, baseY + 18);
+    if (mode === 'net') {
+      ctx.fillText(settings.netControls === 'alt'
+        ? 'Сеть: стрелки движение, E использовать, 1-9 выбрать предмет, Right Shift рывок'
+        : 'Сеть: WASD движение, Shift рывок, F использовать, Q/E переключить', cx, baseY);
+      ctx.fillStyle = '#9cc';
+      ctx.fillText('Скорость матча задаётся хостом в параметрах главного меню.', cx, baseY + 18);
+    } else {
+      ctx.fillText(noviceMode
+        ? 'Управление 1 (Дворник): WASD движение, F использовать, Q/E переключить'
+        : 'Управление 1 (Дворник): WASD движение, Shift рывок, F использовать, Q/E переключить', cx, baseY);
+      ctx.fillStyle = '#9cc';
+      ctx.fillText(noviceMode
+        ? 'Управление 2 (Енот): стрелки, «.» использовать, / вперёд, «,» назад'
+        : 'Управление 2 (Енот): стрелки, Right Shift рывок, «.» использовать, / вперёд, «,» назад', cx, baseY + 18);
+    }
     ctx.fillStyle = '#ccc';
     ctx.fillText('Получил 5 ударов — проиграл. Активных ловушек одновременно: до 10.', cx, baseY + 40);
     if (noviceMode) {

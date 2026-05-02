@@ -325,6 +325,15 @@
       }
 
       // Действия
+      if (this.input.wasPressed) {
+        const types = this.itemTypes();
+        for (let i = 0; i < types.length; i++) {
+          if (this.input.wasPressed('select' + i)) {
+            this.selectedTrap = i;
+            break;
+          }
+        }
+      }
       if (this.input.wasPressed && this.input.wasPressed('switchNext')) {
         this.selectedTrap = (this.selectedTrap + 1) % this.itemTypes().length;
       }
