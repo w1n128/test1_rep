@@ -2,7 +2,7 @@
 
 Маленькая 2D-игра в стиле Том и Джерри: дворник пытается поймать енота при помощи мышеловок, петард, люков, банановых кожурок и предметов для драки. Енот — то же самое в обратную сторону. Подбираются припасы, есть скрытность, ночной режим и ловушки.
 
-Сделано на чистом HTML5 Canvas + WebAudio + WebRTC, без бэкенда.
+Игровое ядро сделано на vanilla JavaScript + HTML5 Canvas 2D + WebAudio. Графика использует процедурные спрайты и PNG-ассеты, музыка — подготовленные OGG-треки с процедурным fallback. Сетевой режим работает через WebRTC DataChannel с внешним signaling/TURN, без собственного backend-сервера.
 
 ## Быстрый старт (локально)
 
@@ -13,6 +13,26 @@ python3 -m http.server 8765
 ```
 
 Затем открыть в браузере: `http://localhost:8765/`
+
+## Android APK
+
+Первая Android-версия собирается через Capacitor: игра остаётся HTML5 Canvas/WebAudio, но запускается локально внутри Android WebView. В APK v1 включены `1P vs CPU`, `Режим новичка` и `Параметры`; сетевой режим и Hot Seat скрыты, чтобы не тащить WebRTC/TURN в первый мобильный тест.
+
+Подготовка:
+
+```bash
+npm install
+npm run build:web
+npx cap sync android
+```
+
+Для сборки debug APK нужны Android Studio, Android SDK и JDK:
+
+```bash
+npm run android:build:debug
+```
+
+APK появится в `android/app/build/outputs/apk/debug/`. Для Google Play позже понадобится AAB (`bundleRelease`), а не APK.
 
 ## Режимы игры
 
@@ -144,7 +164,7 @@ https://<your-username>.github.io/<repo-name>/
 ```
 src/
   config.js     — все балансные константы и палитра
-  audio.js      — WebAudio: SFX + процедурный саундтрек
+  audio.js      — WebAudio: SFX + OGG-музыка с процедурным fallback
   particles.js  — частицы (искры, пыль, звёзды)
   sprites.js    — все спрайты (32×32 пиксельная графика, генерируется в браузере)
   arena.js      — раскладка препятствий

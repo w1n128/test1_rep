@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Свалкус</string>
+    <string name="title_activity_main">Свалкус</string>
+    <string name="package_name">com.w1n128.svalkus</string>
+    <string name="custom_url_scheme">com.w1n128.svalkus</string>
+</resources>

@@ -19,9 +19,13 @@
     }
     window.removeEventListener('keydown', initAudioOnce);
     window.removeEventListener('mousedown', initAudioOnce);
+    window.removeEventListener('pointerdown', initAudioOnce);
+    window.removeEventListener('touchstart', initAudioOnce);
   }
   window.addEventListener('keydown', initAudioOnce);
   window.addEventListener('mousedown', initAudioOnce);
+  window.addEventListener('pointerdown', initAudioOnce);
+  window.addEventListener('touchstart', initAudioOnce, { passive: true });
 
   // ===== Mute-кнопка в правом верхнем углу (под инвентарём, чтобы не перекрывать) =====
   const MUTE_BTN = { x: C.CANVAS_W - 36, y: 36, w: 28, h: 28 };
@@ -131,6 +135,42 @@
     return settings.controls === 'alt' && G.input.netAlt ? G.input.netAlt : G.input.p1;
   }
 
+  function isNightActive() {
+    if (!C.nightEnabled()) return false;
+    const cycle = C.NIGHT_DAY_DURATION + C.NIGHT_DURATION;
+    const phase = ((matchTime % cycle) + cycle) % cycle;
+    return phase >= C.NIGHT_DAY_DURATION;
+  }
+
+  function isAndroidApp() {
+    return !!(G.platform && G.platform.android);
+  }
+
+  function mainMenuOptions() {
+    const full = [
+      { key: '1', title: '1P vs CPU', desc: '— один игрок против компьютера', action: 'cpu' },
+      { key: '2', title: '2P Hot Seat', desc: '— два игрока за одной клавиатурой', action: 'pvp' },
+      { key: '3', title: 'По сети', desc: '— игра с другом через интернет', action: 'net' },
+      { key: '4', title: 'Режим новичка', desc: '— спокойный 1P: меньше предметов и скорость ниже', action: 'novice' },
+      { key: '5', title: 'Параметры', desc: '— скорость игры и управление', action: 'settings' },
+    ];
+    if (!isAndroidApp()) return full;
+    return [
+      { key: '1', title: '1P vs CPU', desc: '— один игрок против компьютера', action: 'cpu' },
+      { key: '2', title: 'Режим новичка', desc: '— проще, медленнее, без лишних систем', action: 'novice' },
+      { key: '3', title: 'Параметры', desc: '— скорость игры и управление', action: 'settings' },
+    ];
+  }
+
+  function selectMainMenuOption(option) {
+    if (!option) return;
+    if (option.action === 'cpu') startMatch('cpu');
+    else if (option.action === 'pvp') startMatch('pvp');
+    else if (option.action === 'net' && !isAndroidApp()) { state = STATE.MENU_NET; netMenuChoice = 0; }
+    else if (option.action === 'novice') startMatch('cpu', { novice: true });
+    else if (option.action === 'settings') { state = STATE.SETTINGS; settingsChoice = 0; }
+  }
+
   function toggleSettingsOption() {
     if (settingsChoice === 0) {
       settings.gameSpeed = settings.gameSpeed === 1 ? 0.5 : 1;
@@ -144,7 +184,7 @@
     if (!G.audio || !G.audio.music || !players.length) return;
     const anyDancing = players.some((p) => p.alive && p.dancing);
     const anyStar = players.some((p) => p.alive && p.starT > 0);
-    if (G.audio.music.setMode) G.audio.music.setMode(anyDancing ? 'disco' : 'chase');
+    if (G.audio.music.setMode) G.audio.music.setMode(anyDancing ? 'disco' : isNightActive() ? 'night' : 'chase');
     if (G.audio.music.setStarBoost) G.audio.music.setStarBoost(anyStar);
   }
 
@@ -415,12 +455,15 @@
     time += dt;
 
     if (state === STATE.MENU) {
-      const total = 5;
-      if (G.input.sys.wasPressed('mode1')) { startMatch('cpu'); return; }
-      if (G.input.sys.wasPressed('mode2')) { startMatch('pvp'); return; }
-      if (G.input.sys.wasPressed('mode3')) { state = STATE.MENU_NET; netMenuChoice = 0; return; }
-      if (G.input.sys.wasPressed('mode4')) { startMatch('cpu', { novice: true }); return; }
-      if (G.input.sys.wasPressed('mode5')) { state = STATE.SETTINGS; settingsChoice = 0; return; }
+      const options = mainMenuOptions();
+      const total = options.length;
+      if (menuChoice >= total) menuChoice = total - 1;
+      for (let i = 0; i < total; i++) {
+        if (G.input.sys.wasPressed('mode' + (i + 1))) {
+          selectMainMenuOption(options[i]);
+          return;
+        }
+      }
       if (G.input.p1.wasPressed('up') || G.input.p2.wasPressed('up')) {
         menuChoice = (menuChoice - 1 + total) % total;
       }
@@ -428,11 +471,7 @@
         menuChoice = (menuChoice + 1) % total;
       }
       if (G.input.sys.wasPressed('confirm') || G.input.p1.wasPressed('place') || G.input.p2.wasPressed('place')) {
-        if (menuChoice === 0) startMatch('cpu');
-        else if (menuChoice === 1) startMatch('pvp');
-        else if (menuChoice === 2) { state = STATE.MENU_NET; netMenuChoice = 0; }
-        else if (menuChoice === 3) startMatch('cpu', { novice: true });
-        else { state = STATE.SETTINGS; settingsChoice = 0; }
+        selectMainMenuOption(options[menuChoice]);
       }
       return;
     }
@@ -613,6 +652,10 @@
     }
 
     if (state === STATE.PAUSED) {
+      if (mode !== 'net' && G.input.sys.wasPressed('restart')) {
+        startMatch(mode, { novice: noviceMode });
+        return;
+      }
       if (G.input.sys.wasPressed('pause')) {
         if (mode === 'net' && netRole === 'client') {
           // Клиент: попросить хоста снять паузу
@@ -640,7 +683,15 @@
     }
   }
 
+  function syncBodyState() {
+    if (!document.body) return;
+    document.body.dataset.gameState = state;
+    document.body.classList.toggle('game-paused', state === STATE.PAUSED);
+    document.body.classList.toggle('game-over', state === STATE.GAMEOVER);
+  }
+
   function draw() {
+    syncBodyState();
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, C.CANVAS_W, C.CANVAS_H);
 
@@ -750,36 +801,39 @@
     drawMenuChase(cx, 155);
 
     // Опции
-    const opts = [
-      ['1', '1P vs CPU', '— один игрок против компьютера'],
-      ['2', '2P Hot Seat', '— два игрока за одной клавиатурой'],
-      ['3', 'По сети', '— игра с другом через интернет'],
-      ['4', 'Режим новичка', '— спокойный 1P: меньше предметов и скорость ниже'],
-      ['5', 'Параметры', '— скорость игры и сетевое управление'],
-    ];
+    const opts = mainMenuOptions();
+    if (menuChoice >= opts.length) menuChoice = opts.length - 1;
     for (let i = 0; i < opts.length; i++) {
       const y = 300 + i * 34;
       const sel = menuChoice === i;
       ctx.fillStyle = sel ? '#fff060' : '#888';
       ctx.font = 'bold 18px monospace';
       ctx.textAlign = 'left';
-      ctx.fillText((sel ? '> ' : '  ') + opts[i][0] + '. ' + opts[i][1], cx - 192, y);
+      ctx.fillText((sel ? '> ' : '  ') + opts[i].key + '. ' + opts[i].title, cx - 192, y);
       ctx.fillStyle = sel ? '#fff' : '#666';
       ctx.font = '12px monospace';
-      ctx.fillText(opts[i][2], cx - 144, y + 18);
+      ctx.fillText(opts[i].desc, cx - 144, y + 18);
     }
 
     // Подсказки
     ctx.font = '12px monospace';
     ctx.fillStyle = '#9c9';
     ctx.textAlign = 'center';
-    ctx.fillText(settings.controls === 'alt'
-      ? '1P/сеть: стрелки движение, E использовать, 1-9 выбрать предмет'
-      : '1P/сеть: WASD движение, F использовать, Q/E переключить', cx, 486);
-    ctx.fillStyle = '#9cc';
-    ctx.fillText('Hot Seat: дворник WASD/F/Q/E, енот стрелки, «.», «,», «/»', cx, 504);
+    if (isAndroidApp()) {
+      ctx.fillText('Android v1: 1P и режим новичка с тач-кнопками. Сеть и Hot Seat отключены.', cx, 486);
+      ctx.fillStyle = '#9cc';
+      ctx.fillText('Слева движение, справа F использовать и рывок, снизу быстрый выбор предмета.', cx, 504);
+    } else {
+      ctx.fillText(settings.controls === 'alt'
+        ? '1P/сеть: стрелки движение, E использовать, 1-9 выбрать предмет'
+        : '1P/сеть: WASD движение, F использовать, Q/E переключить', cx, 486);
+      ctx.fillStyle = '#9cc';
+      ctx.fillText('Hot Seat: дворник WASD/F/Q/E, енот стрелки, «.», «,», «/»', cx, 504);
+    }
     ctx.fillStyle = '#ccc';
-    ctx.fillText('Enter / 1 / 2 / 3 / 4 / 5 — выбор.  Esc — пауза.  M — в меню.', cx, 536);
+    ctx.fillText(isAndroidApp()
+      ? 'Enter / 1 / 2 / 3 — выбор.  Esc — пауза.  M — в меню.'
+      : 'Enter / 1 / 2 / 3 / 4 / 5 — выбор.  Esc — пауза.  M — в меню.', cx, 536);
   }
 
   function drawSettingsMenu() {
@@ -798,7 +852,7 @@
 
     const rows = [
       ['Скорость игры', settings.gameSpeed === 1 ? '1x' : '0.5x'],
-      ['Управление 1P/сеть', settings.controls === 'classic' ? 'WASD / F / Q/E' : 'Стрелки / E / 1-9'],
+      [isAndroidApp() ? 'Управление' : 'Управление 1P/сеть', settings.controls === 'classic' ? 'WASD / F / Q/E' : 'Стрелки / E / 1-9'],
     ];
     for (let i = 0; i < rows.length; i++) {
       const y = 210 + i * 72;
@@ -815,7 +869,9 @@
     ctx.font = '12px monospace';
     ctx.fillText('Стрелки/W/S — выбрать, Enter/F/←/→ — изменить, Esc — назад', cx, 480);
     ctx.fillStyle = '#9cc';
-    ctx.fillText('Hot Seat всегда использует две отдельные схемы: WASD и стрелки.', cx, 506);
+    ctx.fillText(isAndroidApp()
+      ? 'В APK тач-кнопки работают всегда; схема нужна для внешней клавиатуры.'
+      : 'Hot Seat всегда использует две отдельные схемы: WASD и стрелки.', cx, 506);
   }
 
   function drawMenuChase(cx, y) {
@@ -1161,7 +1217,10 @@
         : 'Управление 2 (Енот): стрелки, Right Shift рывок, «.» использовать, / вперёд, «,» назад', cx, baseY + 18);
     }
     ctx.fillStyle = '#ccc';
-    ctx.fillText('Получил 5 ударов — проиграл. Активных ловушек одновременно: до 10.', cx, baseY + 40);
+    const pauseHint = mode !== 'net'
+      ? 'Esc — продолжить, R — рестарт, M — в меню.'
+      : 'Esc — продолжить, M — в меню.';
+    ctx.fillText(pauseHint + ' Получил 5 ударов — проиграл.', cx, baseY + 40);
     if (noviceMode) {
       ctx.fillStyle = '#a0e0ff';
       ctx.fillText('Новичок: без ночи, событий, рывка, звезды, метлы, магнитофона, люка и банки.', cx, baseY + 62);

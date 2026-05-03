@@ -1,11 +1,18 @@
-// WebAudio: SFX-генератор + процедурный саундтрек в стиле Tom & Jerry chase.
-// Без файлов — все звуки и музыка синтезируются на лету.
+// WebAudio: SFX-генератор + музыка из OGG-ассетов с процедурным fallback.
 (function () {
   const G = (window.G = window.G || {});
   let ctx = null;
   let master = null;
   let sfxGain = null;
   let musicGain = null;
+  const MUSIC_ASSETS = {
+    menu: './assets/audio/music/menu_theme.ogg',
+    chase: './assets/audio/music/game_theme_day.ogg',
+    night: './assets/audio/music/menu_theme_night.ogg',
+    star: './assets/audio/music/star_theme_phonk.ogg',
+  };
+  const assetTracks = {};
+  let currentAssetTrack = null;
 
   function ensure() {
     if (ctx) return true;
@@ -31,6 +38,35 @@
   let _muted = false;
 
   function out(dest) { return dest === 'music' ? musicGain : sfxGain; }
+
+  function getAssetTrack(name) {
+    if (!MUSIC_ASSETS[name] || !ctx) return null;
+    if (assetTracks[name]) return assetTracks[name];
+    const audio = new Audio(MUSIC_ASSETS[name]);
+    audio.loop = true;
+    audio.preload = 'auto';
+    audio.playsInline = true;
+    audio.addEventListener('error', () => {
+      const track = assetTracks[name];
+      if (track) track.failed = true;
+    });
+    const source = ctx.createMediaElementSource(audio);
+    source.connect(musicGain);
+    assetTracks[name] = { audio, source, failed: false };
+    return assetTracks[name];
+  }
+
+  function stopAssetTrack(reset = false) {
+    if (!currentAssetTrack) return;
+    const track = assetTracks[currentAssetTrack];
+    if (track) {
+      track.audio.pause();
+      if (reset) {
+        try { track.audio.currentTime = 0; } catch (e) {}
+      }
+    }
+    currentAssetTrack = null;
+  }
 
   function tone(freq, dur, type = 'square', vol = 0.15, when = 0, freqEnd = null, dest = 'sfx') {
     const t0 = ctx.currentTime + when;
@@ -569,7 +605,7 @@
   const TEMPO_STAR_BPM = 188;
   let STEP_SEC = 60 / TEMPO_BPM / 4; // 16-я нота — пересчитываем при смене режима
   const PATTERN_LEN = 16;
-  let mode = 'chase'; // 'chase' | 'disco' | 'menu'
+  let mode = 'chase'; // 'chase' | 'disco' | 'menu' | 'night'
   let starBoost = false;
 
   let musicTimer = null;
@@ -579,7 +615,7 @@
   let scheduledUpTo = 0;
 
   function refreshStepSec() {
-    const bpm = starBoost ? TEMPO_STAR_BPM : mode === 'menu' ? TEMPO_MENU_BPM : mode === 'disco' ? TEMPO_DISCO_BPM : TEMPO_BPM;
+    const bpm = starBoost ? TEMPO_STAR_BPM : mode === 'menu' || mode === 'night' ? TEMPO_MENU_BPM : mode === 'disco' ? TEMPO_DISCO_BPM : TEMPO_BPM;
     const mul = starBoost && window.G && window.G.config ? Math.min(1.05, window.G.config.STAR_MUSIC_SPEED_MUL) : 1;
     STEP_SEC = 60 / (bpm * mul) / 4;
   }
@@ -604,19 +640,20 @@
       return;
     }
 
-    const patterns = mode === 'menu' ? MENU_PATTERNS : mode === 'disco' ? DISCO_PATTERNS : PATTERNS;
+    const patterns = mode === 'menu' || mode === 'night' ? MENU_PATTERNS : mode === 'disco' ? DISCO_PATTERNS : PATTERNS;
     const p = patterns[patternIdx % patterns.length];
-    if (mode === 'menu') {
+    if (mode === 'menu' || mode === 'night') {
+      const nightMul = mode === 'night' ? 0.68 : 1;
       if (p.bass[step]) {
-        pluck(n(p.bass[step]), 0.55, 0.10, when, 'music');
-        tone(n(p.bass[step]) * 0.5, 0.80, 'sine', 0.035, when, null, 'music');
+        pluck(n(p.bass[step]), 0.55, 0.10 * nightMul, when, 'music');
+        tone(n(p.bass[step]) * 0.5, 0.80, 'sine', 0.035 * nightMul, when, null, 'music');
       }
       if (p.lead[step]) {
-        tone(n(p.lead[step]), 0.38, 'sine', 0.055, when, null, 'music');
-        tone(n(p.lead[step]) * 2, 0.26, 'triangle', 0.025, when + 0.04, null, 'music');
+        tone(n(p.lead[step]), 0.38, 'sine', 0.055 * nightMul, when, null, 'music');
+        tone(n(p.lead[step]) * 2, 0.26, 'triangle', 0.025 * nightMul, when + 0.04, null, 'music');
       }
       if (p.shimmer && p.shimmer[step]) {
-        filteredNoise(0.08, 0.012, 6800, when, 'music', 'highpass', 0.7);
+        filteredNoise(0.08, 0.012 * nightMul, 6800, when, 'music', 'highpass', 0.7);
       }
       return;
     }
@@ -683,10 +720,61 @@
     }
   }
 
-  function startMusic(newMode = 'chase') {
+  function stopProceduralMusic() {
+    if (musicTimer) {
+      clearInterval(musicTimer);
+      musicTimer = null;
+    }
+  }
+
+  function targetAssetName() {
+    if (starBoost && MUSIC_ASSETS.star) return 'star';
+    if (MUSIC_ASSETS[mode]) return mode;
+    return null;
+  }
+
+  function startProceduralMusic() {
+    stopAssetTrack();
+    if (musicTimer) return;
+    stepIdx = 0;
+    patIdx = 0;
+    loopsInPattern = 0;
+    scheduledUpTo = ctx.currentTime + 0.05;
+    musicTimer = setInterval(scheduler, 25);
+  }
+
+  function updateMusicPlayback() {
+    if (!ctx) return;
+    const assetName = targetAssetName();
+    if (assetName) {
+      const track = getAssetTrack(assetName);
+      if (track && !track.failed) {
+        stopProceduralMusic();
+        if (currentAssetTrack !== assetName) {
+          stopAssetTrack(true);
+          currentAssetTrack = assetName;
+          try { track.audio.currentTime = 0; } catch (e) {}
+        }
+        const playPromise = track.audio.play();
+        if (playPromise && playPromise.catch) {
+          playPromise.catch(() => {
+            track.failed = true;
+            if (currentAssetTrack === assetName) {
+              currentAssetTrack = null;
+              startProceduralMusic();
+            }
+          });
+        }
+        return;
+      }
+    }
+    startProceduralMusic();
+  }
+
+  function startMusic(newMode) {
     if (!ensure()) return;
-    if (newMode !== 'chase' && newMode !== 'disco' && newMode !== 'menu') newMode = 'chase';
-    if (musicTimer && mode === newMode) return;
+    newMode = newMode || mode || 'chase';
+    if (newMode !== 'chase' && newMode !== 'disco' && newMode !== 'menu' && newMode !== 'night') newMode = 'chase';
     if (ctx.state === 'suspended') ctx.resume();
     mode = newMode;
     starBoost = false;
@@ -695,14 +783,12 @@
     patIdx = 0;
     loopsInPattern = 0;
     scheduledUpTo = ctx.currentTime + 0.05;
-    musicTimer = setInterval(scheduler, 25);
+    updateMusicPlayback();
   }
 
   function stopMusic() {
-    if (musicTimer) {
-      clearInterval(musicTimer);
-      musicTimer = null;
-    }
+    stopProceduralMusic();
+    stopAssetTrack(true);
   }
 
   function setMusicVolume(v) {
@@ -711,7 +797,7 @@
   }
 
   function setMode(newMode) {
-    if (newMode !== 'chase' && newMode !== 'disco' && newMode !== 'menu') return;
+    if (newMode !== 'chase' && newMode !== 'disco' && newMode !== 'menu' && newMode !== 'night') return;
     if (mode === newMode) return;
     mode = newMode;
     refreshStepSec();
@@ -720,6 +806,7 @@
     patIdx = 0;
     loopsInPattern = 0;
     if (ctx) scheduledUpTo = ctx.currentTime + 0.05;
+    updateMusicPlayback();
   }
 
   function setStarBoost(active) {
@@ -728,6 +815,7 @@
     starBoost = active;
     refreshStepSec();
     if (ctx) scheduledUpTo = ctx.currentTime + 0.05;
+    updateMusicPlayback();
   }
 
   function setMuted(m) {

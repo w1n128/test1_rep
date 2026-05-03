@@ -1,0 +1,8 @@
+{
+  "appId": "com.w1n128.svalkus",
+  "appName": "Свалкус",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}
