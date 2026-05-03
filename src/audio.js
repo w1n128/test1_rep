@@ -13,6 +13,7 @@
   };
   const assetTracks = {};
   let currentAssetTrack = null;
+  let musicVolume = 0.32;
 
   function ensure() {
     if (ctx) return true;
@@ -39,6 +40,10 @@
 
   function out(dest) { return dest === 'music' ? musicGain : sfxGain; }
 
+  function assetOutputVolume() {
+    return _muted ? 0 : musicVolume;
+  }
+
   function getAssetTrack(name) {
     if (!MUSIC_ASSETS[name] || !ctx) return null;
     if (assetTracks[name]) return assetTracks[name];
@@ -46,14 +51,21 @@
     audio.loop = true;
     audio.preload = 'auto';
     audio.playsInline = true;
+    audio.volume = assetOutputVolume();
     audio.addEventListener('error', () => {
       const track = assetTracks[name];
       if (track) track.failed = true;
     });
-    const source = ctx.createMediaElementSource(audio);
-    source.connect(musicGain);
-    assetTracks[name] = { audio, source, failed: false };
+    // Музыку из файлов выводим напрямую через HTMLAudioElement.
+    // Так локальный file:// запуск и WebView не попадают в ограничения MediaElementAudioSource CORS.
+    assetTracks[name] = { audio, failed: false };
     return assetTracks[name];
+  }
+
+  function syncAssetVolumes() {
+    for (const key in assetTracks) {
+      assetTracks[key].audio.volume = assetOutputVolume();
+    }
   }
 
   function stopAssetTrack(reset = false) {
@@ -793,7 +805,9 @@
 
   function setMusicVolume(v) {
     if (!ensure()) return;
-    musicGain.gain.value = v;
+    musicVolume = Math.max(0, Math.min(1, v));
+    musicGain.gain.value = musicVolume;
+    syncAssetVolumes();
   }
 
   function setMode(newMode) {
@@ -822,6 +836,7 @@
     _muted = !!m;
     if (!ensure()) return;
     master.gain.value = _muted ? 0 : 0.45;
+    syncAssetVolumes();
   }
   function isMuted() { return _muted; }
 

@@ -257,6 +257,12 @@
     return netRole === 'host' ? players[0] : players[1];
   }
 
+  function localCameraPlayer() {
+    if (!players.length) return null;
+    if (mode === 'net') return localNetPlayer();
+    return players[0];
+  }
+
   function returnToMenu() {
     state = STATE.MENU;
     players = [];
@@ -707,11 +713,11 @@
       drawNetLobbyJoin();
     } else {
       // INTRO / PLAYING / PAUSED / GAMEOVER
-      if (mode === 'net') {
-        const me = localNetPlayer();
-        if (me) G.render.drawSingleScreen(ctx, me, players, trapManager, pickupManager, time, matchTime, arenaEventManager);
-      } else {
+      if (mode === 'pvp') {
         G.render.drawSplitScreen(ctx, players, trapManager, pickupManager, time, matchTime, arenaEventManager);
+      } else {
+        const me = localCameraPlayer();
+        if (me) G.render.drawSingleScreen(ctx, me, players, trapManager, pickupManager, time, matchTime, arenaEventManager);
       }
       if (state === STATE.INTRO)    drawPregameRules();
       if (state === STATE.PAUSED)   drawPaused();
